@@ -13,6 +13,7 @@ import { AppNavigator } from './src/navigation/AppNavigator';
 import { setUser, setError, setLoading, UserProfile } from './src/redux/slices/authSlice';
 import { COLORS } from './src/constants/theme';
 import { CustomAlertProvider, useCustomAlert } from './src/context/CustomAlertContext';
+import { SplashScreen } from './src/components/SplashScreen';
 
 const RootAppContent: React.FC = () => {
   const dispatch = useDispatch();
@@ -138,7 +139,7 @@ const RootAppContent: React.FC = () => {
                 const userProfile: UserProfile = {
                   uid: firebaseUser.uid,
                   name: data?.name || firebaseUser.displayName || 'Member',
-                  email: firebaseUser.email || data?.email || '',
+                  email: data?.email || firebaseUser.email || '',
                   role: data?.role || 'EMPLOYEE',
                   status: data?.status || 'active',
                   department,
@@ -168,12 +169,7 @@ const RootAppContent: React.FC = () => {
   }, [dispatch]);
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Verifying system credentials...</Text>
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return (
