@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "423035296408",
+    "firebase_url": "https://wealth-attendance-default-rtdb.firebaseio.com",
+    "project_id": "wealth-attendance",
+    "storage_bucket": "wealth-attendance.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:423035296408:android:36e243d51b61fa3d500eed",
+        "android_client_info": {
+          "package_name": "com.wealthattendance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkfazfgG-ae7zyFeU9wLDxY8gXiGOVgLg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

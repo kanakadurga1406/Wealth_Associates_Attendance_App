@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getUserRole() {
+      return getUserData().role;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'SUPER_ADMIN';
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'ADMIN';
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && getUserRole() == 'EMPLOYEE';
+    }
+
+    // 1. Users collection rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || getUserRole() == 'SUPER_ADMIN' || getUserRole() == 'ADMIN');
+      allow create: if isAuthenticated() && (
+        (isSuperAdmin() && request.resource.data.role == 'ADMIN') || 
+        (isAdmin() && request.resource.data.role == 'EMPLOYEE') ||
+        (request.auth.uid == userId) // self-registration check if needed
+      );
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isSuperAdmin() || 
+        (isAdmin() && resource.data.role == 'EMPLOYEE' && resource.data.adminId == request.auth.uid)
+      );
+      allow delete: if isSuperAdmin() || (isAdmin() && resource.data.role == 'EMPLOYEE' && resource.data.adminId == request.auth.uid);
+    }
+
+    // 2. Admins collection rules
+    match /admins/{userId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // 3. Employees collection rules
+    match /employees/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || isSuperAdmin());
+      allow write: if isSuperAdmin() || (isAdmin() && (
+        resource == null || resource.data.adminId == request.auth.uid
+      ));
+    }
+
+    // 4. Office Locations rules
+    match /office_locations/{locationId} {
+      // Employees can read their office location. Admins can read/write their own.
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && (resource == null || resource.data.adminId == request.auth.uid);
+    }
+
+    // 5. Attendance rules (writes are only through Cloud Functions, but read access is open to self/admins)
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || 
+        isAdmin() || 
+        isSuperAdmin()
+      );
+      // Allow direct client-side writes for self-marking attendance
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.employeeId == request.auth.uid; 
+    }
+
+    // 6. Activity Logs rules (written by Cloud Functions or read by admins)
+    match /activity_logs/{logId} {
+      allow read: if isSuperAdmin() || isAdmin();
+      allow write: if isAuthenticated(); // Cloud functions bypass, and client can log minor actions
+    }
+
+    // 7. Leave Requests rules
+    match /leave_requests/{requestId} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || 
+        isAdmin() || 
+        isSuperAdmin()
+      );
+      allow create: if isEmployee() && request.resource.data.employeeId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        (isEmployee() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending') || 
+        (isAdmin() && request.resource.data.status in ['Approved', 'Rejected'])
+      );
+      allow delete: if isEmployee() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending';
+    }
+  }
+}
