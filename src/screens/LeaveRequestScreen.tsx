@@ -20,6 +20,8 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { useRealTimeStatus } from '../hooks/useRealTimeStatus';
 import { useCustomAlert } from '../context/CustomAlertContext';
+import { CalendarModal } from '../components/CalendarModal';
+import { TouchableOpacity } from 'react-native';
 
 export const LeaveRequestScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -27,6 +29,9 @@ export const LeaveRequestScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
+  
+  const [startDateModalVisible, setStartDateModalVisible] = useState(false);
+  const [endDateModalVisible, setEndDateModalVisible] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [myLeaves, setMyLeaves] = useState<any[]>([]);
@@ -212,19 +217,27 @@ export const LeaveRequestScreen: React.FC<{ navigation: any }> = ({ navigation }
           </Text>
 
           <View style={styles.form}>
-            <Input
-              label="Start Date (YYYY-MM-DD)"
-              placeholder="YYYY-MM-DD"
-              value={startDate}
-              onChangeText={setStartDate}
-            />
+            <TouchableOpacity onPress={() => setStartDateModalVisible(true)} activeOpacity={0.7}>
+              <View pointerEvents="none">
+                <Input
+                  label="Start Date (YYYY-MM-DD)"
+                  placeholder="Select Start Date"
+                  value={startDate}
+                  editable={false}
+                />
+              </View>
+            </TouchableOpacity>
 
-            <Input
-              label="End Date (YYYY-MM-DD)"
-              placeholder="YYYY-MM-DD"
-              value={endDate}
-              onChangeText={setEndDate}
-            />
+            <TouchableOpacity onPress={() => setEndDateModalVisible(true)} activeOpacity={0.7}>
+              <View pointerEvents="none">
+                <Input
+                  label="End Date (YYYY-MM-DD)"
+                  placeholder="Select End Date"
+                  value={endDate}
+                  editable={false}
+                />
+              </View>
+            </TouchableOpacity>
 
             <Input
               label="Reason / Details"
@@ -285,6 +298,30 @@ export const LeaveRequestScreen: React.FC<{ navigation: any }> = ({ navigation }
           )}
         </Card>
           </ScrollView>
+
+          <CalendarModal
+            visible={startDateModalVisible}
+            onClose={() => setStartDateModalVisible(false)}
+            onSelectDate={(date) => {
+              setStartDate(date);
+              // Auto-reset or advance end date if it is before the new start date
+              if (endDate && date > endDate) {
+                setEndDate(date);
+              }
+            }}
+            selectedDate={startDate}
+            minDate={new Date().toISOString().split('T')[0]}
+            title="Select Start Date"
+          />
+
+          <CalendarModal
+            visible={endDateModalVisible}
+            onClose={() => setEndDateModalVisible(false)}
+            onSelectDate={setEndDate}
+            selectedDate={endDate}
+            minDate={startDate || new Date().toISOString().split('T')[0]}
+            title="Select End Date"
+          />
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>

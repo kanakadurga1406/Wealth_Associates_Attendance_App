@@ -53,7 +53,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin() || isSuperAdmin());
       allow write: if isSuperAdmin() || (isAdmin() && (
         resource == null || resource.data.adminId == request.auth.uid
-      ));
+      )) || (isAuthenticated() && request.auth.uid == userId);
     }
 
     // 4. Office Locations rules
@@ -94,6 +94,22 @@ service cloud.firestore {
         (isAdmin() && request.resource.data.status in ['Approved', 'Rejected'])
       );
       allow delete: if isEmployee() && resource.data.employeeId == request.auth.uid && resource.data.status == 'Pending';
+    }
+
+    // 8. Departments rules
+    match /departments/{departmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    // 9. Payroll Payments rules
+    match /payroll_payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() || 
+        isAdmin() || 
+        resource.data.employeeId == request.auth.uid
+      );
+      allow write: if isSuperAdmin() || isAdmin();
     }
   }
 }

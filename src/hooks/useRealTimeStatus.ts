@@ -29,11 +29,10 @@ export const useRealTimeStatus = () => {
     const handleConnectionChange = (snapshot: any) => {
       const isConnected = snapshot.val();
       if (isConnected) {
-        // Setup onDisconnect hook to mark offline
-        statusRef.onDisconnect().set({
+        // Setup onDisconnect hook to mark offline without erasing details
+        statusRef.onDisconnect().update({
           state: 'offline',
           lastSeen: database.ServerValue.TIMESTAMP,
-          checkInStatus: 'unknown',
         }).then(() => {
           // Mark online initially
           statusRef.update({

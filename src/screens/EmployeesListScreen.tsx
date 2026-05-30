@@ -22,6 +22,7 @@ import { Header } from '../components/Header';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Input } from '../components/Input';
+import { TimePickerModal } from '../components/TimePickerModal';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useCustomAlert } from '../context/CustomAlertContext';
 
@@ -43,13 +44,18 @@ export const EmployeesListScreen: React.FC = () => {
   
   // Edit Form Fields
   const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editSalary, setEditSalary] = useState('');
   const [editAllowedLeaves, setEditAllowedLeaves] = useState('');
   const [editWorkTimings, setEditWorkTimings] = useState('');
-  const [editWeekOff, setEditWeekOff] = useState('');
+  const [editWeekOffs, setEditWeekOffs] = useState<string[]>([]);
   const [editSelectedAdmin, setEditSelectedAdmin] = useState<AdminItem | null>(null);
+
+  // Time Picker States
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end'>('start');
 
   // Selector visibility and search
   const [admins, setAdmins] = useState<AdminItem[]>([]);
@@ -58,6 +64,48 @@ export const EmployeesListScreen: React.FC = () => {
   const [editWeekOffModalVisible, setEditWeekOffModalVisible] = useState(false);
   const [editAdminModalVisible, setEditAdminModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Department Selection States
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [departmentModalVisible, setDepartmentModalVisible] = useState(false);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+
+  const parts = editWorkTimings.split(' - ');
+  let startTime = parts[0] || '09:00 AM';
+  let endTime = parts[1] || '06:00 PM';
+
+  // Parse legacy 24-hour time format to 12-hour format with AM/PM
+  if (startTime && !startTime.includes('AM') && !startTime.includes('PM')) {
+    const [h, m] = startTime.split(':');
+    const hr = parseInt(h) || 9;
+    const period = hr >= 12 ? 'PM' : 'AM';
+    const displayHr = hr % 12 === 0 ? 12 : hr % 12;
+    startTime = `${String(displayHr).padStart(2, '0')}:${m || '00'} ${period}`;
+  }
+  if (endTime && !endTime.includes('AM') && !endTime.includes('PM')) {
+    const [h, m] = endTime.split(':');
+    const hr = parseInt(h) || 18;
+    const period = hr >= 12 ? 'PM' : 'AM';
+    const displayHr = hr % 12 === 0 ? 12 : hr % 12;
+    endTime = `${String(displayHr).padStart(2, '0')}:${m || '00'} ${period}`;
+  }
+
+  const [startTimeVal, startTimePeriod] = startTime.split(' ');
+  const [endTimeVal, endTimePeriod] = endTime.split(' ');
+
+  const [startHour, startMin] = (startTimeVal || '09:00').split(':');
+  const [endHour, endMin] = (endTimeVal || '06:00').split(':');
+
+  const startPeriod = startTimePeriod || 'AM';
+  const endPeriod = endTimePeriod || 'PM';
+
+  const handleTimeConfirm = (hour: string, minute: string, period: string) => {
+    if (timePickerTarget === 'start') {
+      setEditWorkTimings(`${hour}:${minute} ${period} - ${endTime}`);
+    } else {
+      setEditWorkTimings(`${startTime} - ${hour}:${minute} ${period}`);
+    }
+  };
 
   const weekDays = [
     'Sunday',
@@ -96,6 +144,58 @@ export const EmployeesListScreen: React.FC = () => {
     }
   }, [adminUser]);
 
+  // Load departments with auto-seeding defaults if collection is empty
+  useEffect(() => {
+    const unsubscribe = firestore()
+      .collection('departments')
+      .orderBy('name', 'asc')
+      .onSnapshot((snapshot) => {
+        if (snapshot) {
+          if (snapshot.empty) {
+            const defaults = ['Engineering', 'Sales', 'HR', 'Marketing', 'Finance', 'General'];
+            defaults.forEach(async (name) => {
+              await firestore().collection('departments').add({
+                name,
+                createdAt: firestore.FieldValue.serverTimestamp()
+              });
+            });
+          } else {
+            const list = snapshot.docs.map(doc => doc.data().name as string);
+            setDepartments(list);
+          }
+        }
+      }, (err) => {
+        console.warn('Error fetching departments:', err);
+      });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddDepartment = async () => {
+    const trimmed = newDepartmentName.trim();
+    if (!trimmed) {
+      showAlert('Validation Error', 'Department name cannot be empty.');
+      return;
+    }
+
+    if (departments.some(d => d.toLowerCase() === trimmed.toLowerCase())) {
+      showAlert('Validation Error', 'Department already exists.');
+      return;
+    }
+
+    try {
+      await firestore().collection('departments').add({
+        name: trimmed,
+        createdAt: firestore.FieldValue.serverTimestamp()
+      });
+      setNewDepartmentName('');
+      showAlert('Success', `Department "${trimmed}" added successfully.`);
+    } catch (err: any) {
+      console.warn('Error adding department:', err);
+      showAlert('Error', err.message || 'Failed to add department.');
+    }
+  };
+
   useEffect(() => {
     if (!adminUser) return;
 
@@ -116,30 +216,39 @@ export const EmployeesListScreen: React.FC = () => {
         console.log('Logged-in Admin UID:', adminUser.uid);
         console.log('Number of raw employees matched in query:', usersSnapshot.size);
 
-        // Hydrate with employee collection (department, phone) and admin manager name
-        const hydratedList = [];
-        for (const doc of usersSnapshot.docs) {
-          const userData = doc.data();
+        // Hydrate with employee collection (department, phone) and admin manager name in parallel
+        const hydratedList = await Promise.all(
+          usersSnapshot.docs.map(async (doc) => {
+            const userData = doc.data();
+            const employeeId = doc.id;
 
-          const empDoc = await firestore().collection('employees').doc(doc.id).get();
-          const empData = empDoc.data() || {};
+            // Fetch employee data and admin data in parallel
+            const [empDoc, adminDoc] = await Promise.all([
+              firestore().collection('employees').doc(employeeId).get(),
+              userData.adminId
+                ? firestore().collection('users').doc(userData.adminId).get()
+                : Promise.resolve(null)
+            ]);
 
-          let adminName = '';
-          const adminId = userData.adminId || empDoc.data()?.adminId;
-          if (adminId) {
-            const adminDoc = await firestore().collection('users').doc(adminId).get();
-            if (adminDoc.exists()) {
+            const empData = empDoc && empDoc.exists() ? empDoc.data() || {} : {};
+            let adminName = '';
+            
+            if (adminDoc && adminDoc.exists()) {
               adminName = adminDoc.data()?.name || 'Unnamed Admin';
+            } else if (empData.adminId) {
+              // Fallback if adminId is only present in employee sub-profile
+              const fallbackAdminDoc = await firestore().collection('users').doc(empData.adminId).get();
+              adminName = fallbackAdminDoc.exists() ? fallbackAdminDoc.data()?.name || 'Unnamed Admin' : '';
             }
-          }
 
-          hydratedList.push({
-            uid: doc.id,
-            ...userData,
-            ...empData,
-            adminName
-          });
-        }
+            return {
+              uid: employeeId,
+              ...userData,
+              ...empData,
+              adminName,
+            };
+          })
+        );
 
         console.log('Hydrated List Size:', hydratedList.length);
         console.log('---------------------------------');
@@ -191,12 +300,17 @@ export const EmployeesListScreen: React.FC = () => {
   const handleOpenEditModal = (employee: any) => {
     setEditingEmployee(employee);
     setEditName(employee.name || '');
+    setEditEmail(employee.email || '');
     setEditDepartment(employee.department || '');
     setEditPhone(employee.phone || '');
     setEditSalary(String(employee.salary || ''));
     setEditAllowedLeaves(String(employee.allowedLeaves || ''));
-    setEditWorkTimings(employee.workTimings || '09:00 - 18:00');
-    setEditWeekOff(employee.weekOff || 'Sunday');
+    setEditWorkTimings(employee.workTimings || '09:00 AM - 06:00 PM');
+    if (employee.weekOff) {
+      setEditWeekOffs(employee.weekOff.split(', ').filter(Boolean));
+    } else {
+      setEditWeekOffs(['Sunday']);
+    }
     
     if (adminUser?.role === 'SUPER_ADMIN' && employee.adminId) {
       const currentAdmin = admins.find(a => a.uid === employee.adminId);
@@ -219,8 +333,14 @@ export const EmployeesListScreen: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editingEmployee) return;
 
-    if (!editName || !editDepartment || !editPhone || !editSalary || !editAllowedLeaves || !editWorkTimings || !editWeekOff) {
+    if (!editName || !editEmail || !editDepartment || !editPhone || !editSalary || !editAllowedLeaves || !editWorkTimings || editWeekOffs.length === 0) {
       showAlert('Validation Error', 'All fields are required.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editEmail.trim())) {
+      showAlert('Validation Error', 'Please enter a valid email address.');
       return;
     }
 
@@ -237,6 +357,7 @@ export const EmployeesListScreen: React.FC = () => {
       // 1. Update users collection
       const userUpdates: any = {
         name: editName.trim(),
+        email: editEmail.trim().toLowerCase(),
       };
       if (adminUser?.role === 'SUPER_ADMIN') {
         userUpdates.adminId = adminId;
@@ -250,7 +371,7 @@ export const EmployeesListScreen: React.FC = () => {
         salary: parseFloat(editSalary) || 0,
         allowedLeaves: parseInt(editAllowedLeaves) || 0,
         workTimings: editWorkTimings.trim(),
-        weekOff: editWeekOff,
+        weekOff: editWeekOffs.join(', '),
       };
       if (adminUser?.role === 'SUPER_ADMIN') {
         employeeUpdates.adminId = adminId;
@@ -378,12 +499,32 @@ export const EmployeesListScreen: React.FC = () => {
                   />
 
                   <Input
-                    label="Department"
-                    placeholder="e.g. Engineering, Sales"
-                    value={editDepartment}
-                    onChangeText={setEditDepartment}
+                    label="Email Address"
+                    placeholder="janedoe@wealthapp.com"
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                     autoCorrect={false}
                   />
+
+                  {/* Department Selector */}
+                  <View style={styles.editSelectorContainer}>
+                    <Text style={styles.editSelectorLabel}>Department</Text>
+                    <TouchableOpacity 
+                      style={styles.editSelectorField} 
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setDepartmentModalVisible(true);
+                      }}
+                    >
+                      <Text style={editDepartment ? styles.editSelectorValueText : styles.editSelectorPlaceholderText}>
+                        {editDepartment || 'Select Department'}
+                      </Text>
+                      <Icon name="chevron-down" size={16} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
 
                   <Input
                     label="Phone Number"
@@ -412,13 +553,43 @@ export const EmployeesListScreen: React.FC = () => {
                     autoCorrect={false}
                   />
 
-                  <Input
-                    label="Work Timings"
-                    placeholder="e.g. 09:00 - 18:00"
-                    value={editWorkTimings}
-                    onChangeText={setEditWorkTimings}
-                    autoCorrect={false}
-                  />
+                  {/* Work Timings Selector */}
+                  <View style={styles.editSelectorContainer}>
+                    <Text style={styles.editSelectorLabel}>Work Timings</Text>
+                    <View style={styles.timePickerRow}>
+                      <TouchableOpacity 
+                        style={[styles.editSelectorField, { flex: 1, marginRight: SPACING.xs }]} 
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          setTimePickerTarget('start');
+                          setTimePickerVisible(true);
+                        }}
+                      >
+                        <View>
+                          <Text style={styles.timeLabelTitle}>Start Time</Text>
+                          <Text style={styles.editSelectorValueText}>{startTime}</Text>
+                        </View>
+                        <Icon name="time-outline" size={16} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={[styles.editSelectorField, { flex: 1, marginLeft: SPACING.xs }]} 
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          setTimePickerTarget('end');
+                          setTimePickerVisible(true);
+                        }}
+                      >
+                        <View>
+                          <Text style={styles.timeLabelTitle}>End Time</Text>
+                          <Text style={styles.editSelectorValueText}>{endTime}</Text>
+                        </View>
+                        <Icon name="time-outline" size={16} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
                   {/* Week Off Selector */}
                   <View style={styles.editSelectorContainer}>
@@ -431,8 +602,8 @@ export const EmployeesListScreen: React.FC = () => {
                         setEditWeekOffModalVisible(true);
                       }}
                     >
-                      <Text style={editWeekOff ? styles.editSelectorValueText : styles.editSelectorPlaceholderText}>
-                        {editWeekOff || 'Select Week Off Day'}
+                      <Text style={editWeekOffs.length > 0 ? styles.editSelectorValueText : styles.editSelectorPlaceholderText}>
+                        {editWeekOffs.length > 0 ? editWeekOffs.join(', ') : 'Select Week Off Days'}
                       </Text>
                       <Icon name="chevron-down" size={16} color={COLORS.textSecondary} />
                     </TouchableOpacity>
@@ -549,7 +720,7 @@ export const EmployeesListScreen: React.FC = () => {
                   />
                   <View style={styles.nestedModalContent}>
                     <View style={styles.nestedModalHeader}>
-                      <Text style={styles.nestedModalTitle}>Select Week Off Day</Text>
+                      <Text style={styles.nestedModalTitle}>Select Week Off Days</Text>
                       <TouchableOpacity onPress={() => setEditWeekOffModalVisible(false)}>
                         <Icon name="close" size={24} color={COLORS.text} />
                       </TouchableOpacity>
@@ -558,19 +729,35 @@ export const EmployeesListScreen: React.FC = () => {
                     <FlatList
                       data={weekDays}
                       keyExtractor={(item) => item}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity 
-                          style={styles.nestedItem} 
-                          onPress={() => {
-                            setEditWeekOff(item);
-                            setEditWeekOffModalVisible(false);
-                          }}
-                        >
-                          <Text style={styles.nestedItemNameText}>{item}</Text>
-                          <Icon name="chevron-forward" size={16} color={COLORS.border} />
-                        </TouchableOpacity>
-                      )}
+                      renderItem={({ item }) => {
+                        const isSelected = editWeekOffs.includes(item);
+                        return (
+                          <TouchableOpacity 
+                            style={styles.nestedItem} 
+                            activeOpacity={0.7}
+                            onPress={() => {
+                              if (isSelected) {
+                                setEditWeekOffs(editWeekOffs.filter(day => day !== item));
+                              } else {
+                                setEditWeekOffs([...editWeekOffs, item]);
+                              }
+                            }}
+                          >
+                            <Text style={styles.nestedItemNameText}>{item}</Text>
+                            <Icon 
+                              name={isSelected ? 'checkbox-outline' : 'square-outline'} 
+                              size={20} 
+                              color={isSelected ? COLORS.primary : COLORS.border} 
+                            />
+                          </TouchableOpacity>
+                        );
+                      }}
                       ItemSeparatorComponent={() => <View style={styles.nestedItemSeparator} />}
+                    />
+                    <Button
+                      title="Done"
+                      onPress={() => setEditWeekOffModalVisible(false)}
+                      style={{ marginTop: SPACING.md }}
                     />
                   </View>
                 </View>
@@ -579,6 +766,79 @@ export const EmployeesListScreen: React.FC = () => {
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Custom Bottom Sheet Dropdown Overlay for Department Selection */}
+      {departmentModalVisible && (
+        <View style={styles.nestedModalContainer}>
+          <TouchableOpacity 
+            style={styles.nestedBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setDepartmentModalVisible(false)} 
+          />
+          <View style={styles.nestedModalContent}>
+            <View style={styles.nestedModalHeader}>
+              <Text style={styles.nestedModalTitle}>Select Department</Text>
+              <TouchableOpacity onPress={() => setDepartmentModalVisible(false)}>
+                <Icon name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Option to Add New Department */}
+            <View style={styles.addDepartmentRow}>
+              <TextInput
+                placeholder="Add new department..."
+                value={newDepartmentName}
+                onChangeText={setNewDepartmentName}
+                style={styles.addDepartmentInput}
+                autoCorrect={false}
+              />
+              <TouchableOpacity 
+                style={styles.addDepartmentBtn}
+                onPress={handleAddDepartment}
+              >
+                <Text style={styles.addDepartmentBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={departments}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => {
+                const isSelected = item === editDepartment;
+                return (
+                  <TouchableOpacity 
+                    style={styles.nestedItem} 
+                    onPress={() => {
+                      setEditDepartment(item);
+                      setDepartmentModalVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.nestedItemNameText, isSelected && { color: COLORS.primary }]}>
+                      {item}
+                    </Text>
+                    {isSelected && <Icon name="checkmark" size={18} color={COLORS.primary} />}
+                  </TouchableOpacity>
+                );
+              }}
+              ItemSeparatorComponent={() => <View style={styles.nestedItemSeparator} />}
+              ListEmptyComponent={
+                <View style={styles.nestedEmptyContainer}>
+                  <Text style={styles.nestedEmptyText}>No departments configured yet.</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      )}
+
+      <TimePickerModal
+        visible={timePickerVisible}
+        title={timePickerTarget === 'start' ? 'Select Start Time' : 'Select End Time'}
+        initialHour={timePickerTarget === 'start' ? (startHour || '09') : (endHour || '06')}
+        initialMinute={timePickerTarget === 'start' ? (startMin || '00') : (endMin || '00')}
+        initialPeriod={timePickerTarget === 'start' ? (startPeriod || 'AM') : (endPeriod || 'PM')}
+        onClose={() => setTimePickerVisible(false)}
+        onConfirm={handleTimeConfirm}
+      />
     </View>
   );
 };
@@ -814,6 +1074,45 @@ const styles = StyleSheet.create({
   nestedEmptyText: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeLabelTitle: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  addDepartmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: '#F9F9F9',
+    paddingHorizontal: SPACING.sm,
+    height: 48,
+  },
+  addDepartmentInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.text,
+    paddingVertical: 0,
+  },
+  addDepartmentBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+  },
+  addDepartmentBtnText: {
+    color: COLORS.surface,
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
 

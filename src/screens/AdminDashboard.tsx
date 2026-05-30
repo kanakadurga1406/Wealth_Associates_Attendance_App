@@ -21,7 +21,6 @@ import { useRealTimeStatus } from '../hooks/useRealTimeStatus';
 export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) => {
   const adminUser = useSelector((state: RootState) => state.auth.user);
   const [stats, setStats] = useState({ present: 0, late: 0, absent: 0, totalEmployees: 0, pendingLeaves: 0, pendingDevices: 0 });
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   const dispatch = useDispatch();
   const { updateActivity } = useRealTimeStatus();
@@ -85,20 +84,7 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
             }));
           });
 
-        // 3. Fetch recent activity logs for these employees
-        const unsubscribeActivities = firestore()
-          .collection('activity_logs')
-          .orderBy('timestamp', 'desc')
-          .limit(5)
-          .onSnapshot((logsSnapshot) => {
-            if (!logsSnapshot) return;
-            const logs = logsSnapshot.docs
-              .map(doc => ({ id: doc.id, ...(doc.data() as any) }))
-              .filter((log: any) => employeeIds.includes(log.employeeId));
-            setRecentActivities(logs);
-          });
-
-        // 4. Fetch pending leave requests
+        // 3. Fetch pending leave requests
         const unsubscribeLeaves = firestore()
           .collection('leave_requests')
           .where('status', '==', 'Pending')
@@ -110,7 +96,7 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
             setStats(prev => ({ ...prev, pendingLeaves: leaves.length }));
           });
 
-        // 5. Fetch pending device requests
+        // 4. Fetch pending device requests
         const unsubscribeDevices = firestore()
           .collection('device_requests')
           .where('status', '==', 'Pending')
@@ -122,7 +108,6 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
 
         return () => {
           unsubscribeAttendance();
-          unsubscribeActivities();
           unsubscribeLeaves();
           unsubscribeDevices();
         };
@@ -252,24 +237,6 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
             <Text style={styles.menuLabel}>Device Approvals</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Recent Activities */}
-        <Text style={styles.sectionTitle}>Employee Activity Stream</Text>
-        <Card>
-          {recentActivities.length === 0 ? (
-            <Text style={styles.emptyText}>No recent activities recorded today.</Text>
-          ) : (
-            recentActivities.map((item) => (
-              <View key={item.id} style={styles.activityRow}>
-                <Icon name="pulse-outline" size={16} color={COLORS.textSecondary} style={styles.activityIcon} />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>{item.activity}</Text>
-                  <Text style={styles.activityTime}>{formatTime(item.timestamp)}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </Card>
       </ScrollView>
     </View>
   );
@@ -362,28 +329,6 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
     fontSize: 10,
     fontWeight: '900',
-  },
-  activityRow: {
-    flexDirection: 'row',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  activityIcon: {
-    marginTop: 2,
-    marginRight: 8,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityText: {
-    fontSize: 13,
-    color: COLORS.text,
-  },
-  activityTime: {
-    fontSize: 10,
-    color: COLORS.textLight,
-    marginTop: 2,
   },
   emptyText: {
     fontSize: 14,

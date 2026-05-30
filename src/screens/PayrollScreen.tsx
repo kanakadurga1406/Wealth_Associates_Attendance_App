@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   TextInput,
   TouchableOpacity,
+  Modal,
+  Platform,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
@@ -15,12 +17,113 @@ import { COLORS, SPACING } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useCustomAlert } from '../context/CustomAlertContext';
 
 export const PayrollScreen: React.FC = () => {
   const adminUser = useSelector((state: RootState) => state.auth.user);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { showAlert } = useCustomAlert();
+
+  // Payment states
+  const [payments, setPayments] = useState<{[empId: string]: any}>({});
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('UPI');
+
+  const paymentMethods = ['UPI', 'Bank Transfer', 'Cash', 'Cheque'];
+
+  // Listen to current month's payroll payments in real-time
+  useEffect(() => {
+    const utcDate = new Date();
+    const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+    const currentMonthPrefix = istDate.toISOString().split('T')[0].substring(0, 7); // 'YYYY-MM'
+
+    const unsubscribe = firestore()
+      .collection('payroll_payments')
+      .where('month', '==', currentMonthPrefix)
+      .onSnapshot((snapshot) => {
+        if (snapshot) {
+          const map: {[empId: string]: any} = {};
+          snapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            map[data.employeeId] = {
+              id: doc.id,
+              ...data,
+            };
+          });
+          setPayments(map);
+        }
+      }, (err) => {
+        console.warn('Error fetching payroll payments:', err);
+      });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleOpenPaymentModal = (employee: any) => {
+    setSelectedEmployee(employee);
+    setSelectedPaymentMethod('UPI');
+    setPaymentModalVisible(true);
+  };
+
+  const handleUpdatePaymentStatus = async () => {
+    if (!selectedEmployee) return;
+
+    try {
+      const utcDate = new Date();
+      const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+      const currentMonthPrefix = istDate.toISOString().split('T')[0].substring(0, 7); // 'YYYY-MM'
+      const docId = `${selectedEmployee.uid}_${currentMonthPrefix}`;
+
+      await firestore().collection('payroll_payments').doc(docId).set({
+        employeeId: selectedEmployee.uid,
+        month: currentMonthPrefix,
+        status: 'Paid',
+        paymentMethod: selectedPaymentMethod,
+        amount: selectedEmployee.netPay,
+        paidAt: firestore.FieldValue.serverTimestamp(),
+        paidBy: adminUser?.uid || 'system',
+      });
+
+      setPaymentModalVisible(false);
+      setSelectedEmployee(null);
+      showAlert('Success', `Salary paid successfully via ${selectedPaymentMethod} to ${selectedEmployee.name}.`);
+    } catch (err: any) {
+      console.warn('Error marking salary as paid:', err);
+      showAlert('Error', err.message || 'Failed to update payment status.');
+    }
+  };
+
+  const handleResetPaymentStatus = (empId: string, empName: string) => {
+    showAlert(
+      'Reset Payment Status',
+      `Are you sure you want to mark ${empName}'s salary as unpaid?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Unpaid',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const utcDate = new Date();
+              const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+              const currentMonthPrefix = istDate.toISOString().split('T')[0].substring(0, 7);
+              const docId = `${empId}_${currentMonthPrefix}`;
+
+              await firestore().collection('payroll_payments').doc(docId).delete();
+              showAlert('Success', `${empName}'s payment status has been reset to unpaid.`);
+            } catch (err: any) {
+              console.warn('Error resetting payment status:', err);
+              showAlert('Error', err.message || 'Failed to reset payment status.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   useEffect(() => {
     if (!adminUser) return;
@@ -44,126 +147,117 @@ export const PayrollScreen: React.FC = () => {
         const currentYear = istDate.getFullYear();
         const currentMonth = istDate.getMonth();
 
-        const list: any[] = [];
+        const list = await Promise.all(
+          usersSnapshot.docs.map(async (doc) => {
+            const userData = doc.data();
+            const empId = doc.id;
 
-        for (const doc of usersSnapshot.docs) {
-          const userData = doc.data();
-          const empId = doc.id;
+            // Fetch employee profile details, attendance records, and leave requests in parallel
+            const [empDoc, attendanceSnapshot, leavesSnapshot] = await Promise.all([
+              firestore().collection('employees').doc(empId).get(),
+              firestore().collection('attendance').where('employeeId', '==', empId).get(),
+              firestore().collection('leave_requests').where('employeeId', '==', empId).where('status', '==', 'Approved').get(),
+            ]);
 
-          // 1. Fetch employee profile details from the employees collection
-          const empDoc = await firestore().collection('employees').doc(empId).get();
-          const empData = empDoc.data() || {};
+            const empData = empDoc.data() || {};
+            const salary = parseFloat(empData.salary) || 0;
+            const allowedLeaves = parseInt(empData.allowedLeaves) || 0;
 
-          const salary = parseFloat(empData.salary) || 0;
-          const allowedLeaves = parseInt(empData.allowedLeaves) || 0;
+            let presentCount = 0;
+            let lateCount = 0;
+            let absentCount = 0;
 
-          // 2. Fetch current calendar month's attendance records to calculate stats
-          const attendanceSnapshot = await firestore()
-            .collection('attendance')
-            .where('employeeId', '==', empId)
-            .get();
-
-          let presentCount = 0;
-          let lateCount = 0;
-          let absentCount = 0;
-
-          attendanceSnapshot.docs.forEach((aDoc) => {
-            const aData = aDoc.data();
-            if (aData.date && aData.date.startsWith(currentMonthPrefix)) {
-              if (aData.status === 'Present') presentCount++;
-              if (aData.status === 'Late') {
-                presentCount++;
-                lateCount++;
+            attendanceSnapshot.docs.forEach((aDoc) => {
+              const aData = aDoc.data();
+              if (aData.date && aData.date.startsWith(currentMonthPrefix)) {
+                if (aData.status === 'Present') presentCount++;
+                if (aData.status === 'Late') {
+                  presentCount++;
+                  lateCount++;
+                }
+                if (aData.status === 'Absent') absentCount++;
               }
-              if (aData.status === 'Absent') absentCount++;
-            }
-          });
+            });
 
-          // 3. Fetch approved leave requests to sum overlapping leave days
-          const leavesSnapshot = await firestore()
-            .collection('leave_requests')
-            .where('employeeId', '==', empId)
-            .where('status', '==', 'Approved')
-            .get();
+            let approvedDaysThisMonth = 0;
+            let unpaidDaysThisMonth = 0;
+            let legacyPaidDaysThisMonth = 0;
+            let explicitPaidDaysThisMonth = 0;
 
-          let approvedDaysThisMonth = 0;
-          let unpaidDaysThisMonth = 0;
-          let legacyPaidDaysThisMonth = 0;
-          let explicitPaidDaysThisMonth = 0;
+            leavesSnapshot.docs.forEach((lDoc) => {
+              const lData = lDoc.data();
+              try {
+                if (lData.startDate && lData.endDate) {
+                  const reqStart = new Date(lData.startDate);
+                  const reqEnd = new Date(lData.endDate);
+                  const startOfMonth = new Date(currentYear, currentMonth, 1);
+                  const endOfMonth = new Date(currentYear, currentMonth + 1, 0);
 
-          leavesSnapshot.docs.forEach((lDoc) => {
-            const lData = lDoc.data();
-            try {
-              if (lData.startDate && lData.endDate) {
-                const reqStart = new Date(lData.startDate);
-                const reqEnd = new Date(lData.endDate);
-                const startOfMonth = new Date(currentYear, currentMonth, 1);
-                const endOfMonth = new Date(currentYear, currentMonth + 1, 0);
+                  if (!(reqEnd < startOfMonth || reqStart > endOfMonth)) {
+                    const overlapStart = new Date(Math.max(reqStart.getTime(), startOfMonth.getTime()));
+                    const overlapEnd = new Date(Math.min(reqEnd.getTime(), endOfMonth.getTime()));
+                    const diffTime = Math.abs(overlapEnd.getTime() - overlapStart.getTime());
+                    const overlappingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                    approvedDaysThisMonth += overlappingDays;
 
-                if (!(reqEnd < startOfMonth || reqStart > endOfMonth)) {
-                  const overlapStart = new Date(Math.max(reqStart.getTime(), startOfMonth.getTime()));
-                  const overlapEnd = new Date(Math.min(reqEnd.getTime(), endOfMonth.getTime()));
-                  const diffTime = Math.abs(overlapEnd.getTime() - overlapStart.getTime());
-                  const overlappingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                  approvedDaysThisMonth += overlappingDays;
+                    const totalTime = Math.abs(reqEnd.getTime() - reqStart.getTime());
+                    const totalDays = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
 
-                  const totalTime = Math.abs(reqEnd.getTime() - reqStart.getTime());
-                  const totalDays = Math.ceil(totalTime / (1000 * 60 * 60 * 24)) + 1;
-
-                  if (lData.unpaidDaysCount !== undefined) {
-                    unpaidDaysThisMonth += (overlappingDays / totalDays) * lData.unpaidDaysCount;
-                    explicitPaidDaysThisMonth += (overlappingDays / totalDays) * (lData.paidDaysCount || 0);
-                  } else if (lData.isPaid === false) {
-                    unpaidDaysThisMonth += overlappingDays;
-                  } else if (lData.isPaid === true) {
-                    explicitPaidDaysThisMonth += overlappingDays;
-                  } else {
-                    legacyPaidDaysThisMonth += overlappingDays;
+                    if (lData.unpaidDaysCount !== undefined) {
+                      unpaidDaysThisMonth += (overlappingDays / totalDays) * lData.unpaidDaysCount;
+                      explicitPaidDaysThisMonth += (overlappingDays / totalDays) * (lData.paidDaysCount || 0);
+                    } else if (lData.isPaid === false) {
+                      unpaidDaysThisMonth += overlappingDays;
+                    } else if (lData.isPaid === true) {
+                      explicitPaidDaysThisMonth += overlappingDays;
+                    } else {
+                      legacyPaidDaysThisMonth += overlappingDays;
+                    }
                   }
                 }
+              } catch (e) {
+                console.warn('Error parsing leave date overlap:', e);
               }
-            } catch (e) {
-              console.warn('Error parsing leave date overlap:', e);
-            }
-          });
+            });
 
-          // Calculate Salary Deductions
-          const dailyWage = salary / 30;
-          
-          // Calculate net deducted leaves (unpaid days + legacy excess days)
-          const remainingAllowed = Math.max(0, allowedLeaves - explicitPaidDaysThisMonth);
-          const legacyExcess = Math.max(0, legacyPaidDaysThisMonth - remainingAllowed);
-          const extraLeaves = unpaidDaysThisMonth + legacyExcess;
-          const leavesDeduction = extraLeaves * dailyWage;
+            // Calculate Salary Deductions
+            const dailyWage = salary / 30;
+            
+            // Calculate net deducted leaves (unpaid days + legacy excess days)
+            const remainingAllowed = Math.max(0, allowedLeaves - explicitPaidDaysThisMonth);
+            const legacyExcess = Math.max(0, legacyPaidDaysThisMonth - remainingAllowed);
+            const extraLeaves = unpaidDaysThisMonth + legacyExcess;
+            const leavesDeduction = extraLeaves * dailyWage;
 
-          // Late Logins Deduction
-          const lateDeduction = lateCount * 0.5 * dailyWage;
+            // Late Logins Deduction
+            const lateDeduction = lateCount * 0.5 * dailyWage;
 
-          // Absent Days Deduction
-          const absentDeduction = absentCount * dailyWage;
+            // Absent Days Deduction
+            const absentDeduction = absentCount * dailyWage;
 
-          // Totals
-          const totalDeductions = leavesDeduction + lateDeduction + absentDeduction;
-          const netPay = Math.max(0, salary - totalDeductions);
+            // Totals
+            const totalDeductions = leavesDeduction + lateDeduction + absentDeduction;
+            const netPay = Math.max(0, salary - totalDeductions);
 
-          list.push({
-            uid: empId,
-            name: userData.name || 'Unnamed Employee',
-            email: userData.email || '',
-            department: empData.department || userData.department || 'General',
-            salary,
-            allowedLeaves,
-            approvedLeaveDays: approvedDaysThisMonth,
-            extraLeaves,
-            leavesDeduction,
-            lateCount,
-            lateDeduction,
-            absentCount,
-            absentDeduction,
-            totalDeductions,
-            netPay,
-          });
-        }
+            return {
+              uid: empId,
+              name: userData.name || 'Unnamed Employee',
+              email: userData.email || '',
+              department: empData.department || userData.department || 'General',
+              salary,
+              allowedLeaves,
+              approvedLeaveDays: approvedDaysThisMonth,
+              extraLeaves,
+              leavesDeduction,
+              lateCount,
+              lateDeduction,
+              absentCount,
+              absentDeduction,
+              totalDeductions,
+              netPay,
+            };
+          })
+        );
 
         setEmployees(list);
         setLoading(false);
@@ -187,6 +281,7 @@ export const PayrollScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: any }) => {
+    const payment = payments[item.uid];
     return (
       <Card style={styles.card}>
         <View style={styles.cardHeader}>
@@ -244,6 +339,39 @@ export const PayrollScreen: React.FC = () => {
             <Text style={[styles.netPayLabel, { fontSize: 15 }]}>Net Salary Payable</Text>
             <Text style={[styles.netPayValue, { fontSize: 18 }]}>₹{item.netPay.toFixed(2)}</Text>
           </View>
+
+          <View style={styles.paymentSection}>
+            <View style={styles.divider} />
+            <View style={styles.paymentRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.paymentStatusLabel}>PAYMENT STATUS</Text>
+                {payment?.status === 'Paid' ? (
+                  <Text style={styles.paymentStatusPaid}>
+                    Paid via {payment.paymentMethod}
+                  </Text>
+                ) : (
+                  <Text style={styles.paymentStatusUnpaid}>Unpaid</Text>
+                )}
+              </View>
+              {payment?.status === 'Paid' ? (
+                <TouchableOpacity
+                  style={styles.unpayBtn}
+                  activeOpacity={0.7}
+                  onPress={() => handleResetPaymentStatus(item.uid, item.name)}
+                >
+                  <Text style={styles.unpayBtnText}>Mark Unpaid</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.payBtn}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenPaymentModal(item)}
+                >
+                  <Text style={styles.payBtnText}>Mark as Paid</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         </View>
       </Card>
     );
@@ -280,6 +408,66 @@ export const PayrollScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* Payment Selection Modal */}
+      <Modal
+        visible={paymentModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Mark Salary as Paid</Text>
+              <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                <Icon name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              Select the payment method used to pay {selectedEmployee?.name || 'employee'}.
+            </Text>
+
+            <View style={styles.methodsList}>
+              {paymentMethods.map((method) => {
+                const isSelected = method === selectedPaymentMethod;
+                return (
+                  <TouchableOpacity
+                    key={method}
+                    style={[styles.methodItem, isSelected && styles.methodItemSelected]}
+                    onPress={() => setSelectedPaymentMethod(method)}
+                  >
+                    <Text style={[styles.methodText, isSelected && styles.methodTextSelected]}>
+                      {method}
+                    </Text>
+                    {isSelected ? (
+                      <Icon name="checkmark-circle" size={20} color={COLORS.success} />
+                    ) : (
+                      <Icon name="ellipse-outline" size={20} color={COLORS.border} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setPaymentModalVisible(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={handleUpdatePaymentStatus}
+              >
+                <Text style={styles.confirmBtnText}>Confirm Paid</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -409,5 +597,150 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 14,
     marginTop: SPACING.xxl,
+  },
+  // Payment Section Styles
+  paymentSection: {
+    marginTop: SPACING.xs,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  paymentStatusLabel: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
+  },
+  paymentStatusPaid: {
+    fontSize: 13,
+    color: COLORS.success,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  paymentStatusUnpaid: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  payBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  payBtnText: {
+    color: COLORS.surface,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  unpayBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  unpayBtnText: {
+    color: COLORS.danger,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  // Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: SPACING.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  modalDescription: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    lineHeight: 18,
+  },
+  methodsList: {
+    marginBottom: SPACING.lg,
+  },
+  methodItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    marginBottom: SPACING.sm,
+    backgroundColor: '#FAFAFA',
+  },
+  methodItemSelected: {
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.success + '0A',
+  },
+  methodText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  methodTextSelected: {
+    color: COLORS.success,
+    fontWeight: '700',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+    backgroundColor: COLORS.surface,
+  },
+  cancelBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: COLORS.success,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SPACING.sm,
+  },
+  confirmBtnText: {
+    color: COLORS.surface,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

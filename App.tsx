@@ -69,52 +69,69 @@ const RootAppContent: React.FC = () => {
                     });
                     return; // Firestore listener will trigger again with updated document
                   } else if (boundDeviceId !== currentDeviceId) {
-                    // Device mismatch! Check if a pending request already exists
-                    const pendingQuery = await firestore()
-                      .collection('device_requests')
-                      .where('employeeId', '==', firebaseUser.uid)
-                      .where('newDeviceId', '==', currentDeviceId)
-                      .where('status', '==', 'Pending')
-                      .limit(1)
-                      .get();
+                    // Device mismatch! Run the registration check and signOut in background
+                    const registerDeviceRequestAndSignOut = async () => {
+                      try {
+                        const pendingQuery = await firestore()
+                          .collection('device_requests')
+                          .where('employeeId', '==', firebaseUser.uid)
+                          .where('newDeviceId', '==', currentDeviceId)
+                          .where('status', '==', 'Pending')
+                          .limit(1)
+                          .get();
 
-                    if (pendingQuery.empty) {
-                      // Create pending request
-                      await firestore().collection('device_requests').add({
-                        employeeId: firebaseUser.uid,
-                        employeeName: data.name || 'Employee',
-                        employeeEmail: data.email || '',
-                        adminId: data.adminId || '',
-                        oldDeviceId: boundDeviceId,
-                        newDeviceId: currentDeviceId,
-                        status: 'Pending',
-                        requestedAt: firestore.FieldValue.serverTimestamp(),
-                      });
+                        if (pendingQuery.empty) {
+                          // Create pending request
+                          await firestore().collection('device_requests').add({
+                            employeeId: firebaseUser.uid,
+                            employeeName: data.name || 'Employee',
+                            employeeEmail: data.email || '',
+                            adminId: data.adminId || '',
+                            oldDeviceId: boundDeviceId,
+                            newDeviceId: currentDeviceId,
+                            status: 'Pending',
+                            requestedAt: firestore.FieldValue.serverTimestamp(),
+                          });
 
-                      // Log activity
-                      await firestore().collection('activity_logs').add({
-                        employeeId: firebaseUser.uid,
-                        activity: `Login blocked: Device ID mismatch (Requested binding for device: ${currentDeviceId})`,
-                        timestamp: firestore.FieldValue.serverTimestamp(),
-                      });
+                          // Log activity
+                          await firestore().collection('activity_logs').add({
+                            employeeId: firebaseUser.uid,
+                            activity: `Login blocked: Device ID mismatch (Requested binding for device: ${currentDeviceId})`,
+                            timestamp: firestore.FieldValue.serverTimestamp(),
+                          });
 
-                      // Notify Admin
-                      if (data.adminId) {
-                        await firestore().collection('notifications').add({
-                          employeeId: data.adminId,
-                          title: 'Device Approval Request',
-                          body: `${data.name || 'Employee'} requested login approval on a new device.`,
-                          status: 'unread',
-                          createdAt: firestore.FieldValue.serverTimestamp(),
-                        });
+                          // Notify Admin
+                          if (data.adminId) {
+                            await firestore().collection('notifications').add({
+                              employeeId: data.adminId,
+                              title: 'Device Approval Request',
+                              body: `${data.name || 'Employee'} requested login approval on a new device.`,
+                              status: 'unread',
+                              createdAt: firestore.FieldValue.serverTimestamp(),
+                            });
+                          }
+                        }
+                      } catch (dbErr) {
+                        console.warn('Background device registration failed:', dbErr);
+                      } finally {
+                        try {
+                          await auth().signOut();
+                        } catch (signOutErr) {
+                          console.warn('Background signOut failed:', signOutErr);
+                        }
                       }
-                    }
+                    };
 
-                    // Force sign out immediately and block setting redux user state
-                    await auth().signOut();
+                    // Kick off background tasks
+                    registerDeviceRequestAndSignOut();
+
+                    // Immediately show the mismatch alert and clear Redux (which hides SplashScreen)
                     dispatch(setUser(null));
                     dispatch(setError('Device ID mismatch. Please wait for Admin approval.'));
-                    showAlert('Device Mismatch', 'Device ID mismatch. A request has been sent to your Admin for approval. Please wait for approval.');
+                    showAlert(
+                      'Device Mismatch',
+                      'Device ID mismatch. A request has been sent to your Admin for approval. Please wait for approval.'
+                    );
                     return;
                   }
                 }

@@ -359,6 +359,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           status,
           workingHours: 0,
           date: dateString,
+          checkInAddress: address,
         };
 
         await firestore().collection('attendance').add(newAttendance);
@@ -375,6 +376,8 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           checkInStatus: 'checked-in',
           lastCheckIn: database.ServerValue.TIMESTAMP,
           currentActivity: 'Checked-in',
+          checkInAddress: address,
+          checkInTime: database.ServerValue.TIMESTAMP,
         });
 
         showAlert(
@@ -405,6 +408,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         await attendanceDoc.ref.update({
           checkOut: firestore.FieldValue.serverTimestamp(),
           workingHours: Number(workingHours.toFixed(2)),
+          checkOutAddress: address,
         });
 
         // Log success
@@ -419,6 +423,8 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           checkInStatus: 'checked-out',
           lastCheckOut: database.ServerValue.TIMESTAMP,
           currentActivity: 'Checked-out',
+          checkOutAddress: address,
+          checkOutTime: database.ServerValue.TIMESTAMP,
         });
 
         showAlert(

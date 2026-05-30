@@ -28,6 +28,10 @@ interface EmployeePresence {
   currentActivity?: string;
   lastSeen?: number;
   checkInStatus?: 'checked-in' | 'checked-out' | 'unknown';
+  checkInTime?: number;
+  checkOutTime?: number;
+  checkInAddress?: string;
+  checkOutAddress?: string;
 }
 
 export const RealTimeStatusScreen: React.FC = () => {
@@ -47,7 +51,53 @@ export const RealTimeStatusScreen: React.FC = () => {
     if (!adminUser) return;
 
     let rtdbListener: any = null;
+    let unsubscribeAttendance: () => void = () => {};
     let employeeDataMap: { [key: string]: any } = {};
+    let attendanceDataMap: { [key: string]: any } = {};
+    let rtdbDataVal: any = {};
+
+    const utcDate = new Date();
+    const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+    const todayString = istDate.toISOString().split('T')[0];
+
+    const mergeAndSet = () => {
+      const mergedEmployees: EmployeePresence[] = Object.keys(employeeDataMap).map((uid) => {
+        const empData = employeeDataMap[uid];
+        const rtdbData = rtdbDataVal[uid] || {};
+        const attData = attendanceDataMap[uid] || null;
+
+        let checkInStatus: 'checked-in' | 'checked-out' | 'unknown' = 'unknown';
+        if (attData) {
+          if (attData.checkOut) {
+            checkInStatus = 'checked-out';
+          } else if (attData.checkIn) {
+            checkInStatus = 'checked-in';
+          }
+        }
+
+        return {
+          ...empData,
+          state: rtdbData.state || 'offline',
+          currentActivity: rtdbData.currentActivity || 'Away',
+          lastSeen: rtdbData.lastSeen || 0,
+          checkInStatus,
+          checkInTime: attData?.checkIn ? attData.checkIn.getTime() : (rtdbData.checkInTime || 0),
+          checkOutTime: attData?.checkOut ? attData.checkOut.getTime() : (rtdbData.checkOutTime || 0),
+          checkInAddress: attData?.checkInAddress || rtdbData.checkInAddress || '',
+          checkOutAddress: attData?.checkOutAddress || rtdbData.checkOutAddress || '',
+        };
+      });
+
+      // Sort by state (online first), then name
+      mergedEmployees.sort((a, b) => {
+        if (a.state === 'online' && b.state !== 'online') return -1;
+        if (a.state !== 'online' && b.state === 'online') return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      setEmployees(mergedEmployees);
+      setLoading(false);
+    };
 
     // 1. Listen to Firestore employees
     let query = firestore().collection('users').where('role', '==', 'EMPLOYEE');
@@ -56,92 +106,93 @@ export const RealTimeStatusScreen: React.FC = () => {
     }
 
     const unsubscribeFirestore = query.onSnapshot(
-        async (snapshot) => {
-          if (!snapshot) {
-            console.log('RealTimeStatusScreen: received null snapshot');
-            return;
-          }
-
-          console.log('--- REALTIME STATUS SCREEN: FIRESTORE EMPLOYEES FETCH ---');
-          console.log('Logged-in Admin UID:', adminUser.uid);
-          console.log('Number of matched employees:', snapshot.size);
-
-          // Fetch more employee details from employees collection if department info is stored there
-          const empDetailsPromises = snapshot.docs.map(doc =>
-            firestore().collection('employees').doc(doc.id).get()
-          );
-          const empDetailsSnapshots = await Promise.all(empDetailsPromises);
-          
-          const detailsMap: { [key: string]: any } = {};
-          empDetailsSnapshots.forEach(docSnap => {
-            if (docSnap.exists()) {
-              detailsMap[docSnap.id] = docSnap.data();
-            }
-          });
-
-          employeeDataMap = {};
-          snapshot.docs.forEach((doc) => {
-            const data = doc.data();
-            console.log(`Employee Doc ID: ${doc.id}, Name: ${data.name}, adminId in DB: ${data.adminId}`);
-            employeeDataMap[doc.id] = {
-              uid: doc.id,
-              name: data.name,
-              email: data.email,
-              department: detailsMap[doc.id]?.department || 'General',
-            };
-          });
-
-          // 2. Subscribe to RTDB Status updates
-          const rtdbRef = database().ref('/status/users');
-          
-          if (rtdbListener) {
-            rtdbRef.off('value', rtdbListener);
-          }
-
-          console.log('Subscribing to Realtime Database path /status/users...');
-          rtdbListener = rtdbRef.on(
-            'value',
-            (rtdbSnapshot) => {
-              console.log('RTDB onValue callback fired!');
-              const val = rtdbSnapshot.val() || {};
-              console.log('RTDB status/users data payload size:', Object.keys(val).length);
-              
-              const mergedEmployees: EmployeePresence[] = Object.keys(employeeDataMap).map((uid) => {
-                const rtdbData = val[uid] || {};
-                return {
-                  ...employeeDataMap[uid],
-                  state: rtdbData.state || 'offline',
-                  currentActivity: rtdbData.currentActivity || 'Away',
-                  lastSeen: rtdbData.lastSeen || 0,
-                  checkInStatus: rtdbData.checkInStatus || 'unknown',
-                };
-              });
-
-              // Sort by state (online first), then name
-              mergedEmployees.sort((a, b) => {
-                if (a.state === 'online' && b.state !== 'online') return -1;
-                if (a.state !== 'online' && b.state === 'online') return 1;
-                return a.name.localeCompare(b.name);
-              });
-
-              console.log('Merged employee status list size:', mergedEmployees.length);
-              setEmployees(mergedEmployees);
-              setLoading(false);
-            },
-            (rtdbError) => {
-              console.error('RTDB Status listener error:', rtdbError);
-              setLoading(false);
-            }
-          );
-        },
-        (error) => {
-          console.error('Firestore users query error:', error);
+      async (snapshot) => {
+        if (!snapshot) {
           setLoading(false);
+          return;
         }
-      );
+
+        const employeeIds = snapshot.docs.map(doc => doc.id);
+        if (employeeIds.length === 0) {
+          setEmployees([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch employee details (department info) in parallel
+        const empDetailsPromises = employeeIds.map(id =>
+          firestore().collection('employees').doc(id).get()
+        );
+        const empDetailsSnapshots = await Promise.all(empDetailsPromises);
+        const detailsMap: { [key: string]: any } = {};
+        empDetailsSnapshots.forEach(docSnap => {
+          if (docSnap.exists()) {
+            detailsMap[docSnap.id] = docSnap.data();
+          }
+        });
+
+        employeeDataMap = {};
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          employeeDataMap[doc.id] = {
+            uid: doc.id,
+            name: data.name,
+            email: data.email,
+            department: detailsMap[doc.id]?.department || 'General',
+          };
+        });
+
+        // 2. Setup today's attendance snapshot listener
+        unsubscribeAttendance();
+        unsubscribeAttendance = firestore()
+          .collection('attendance')
+          .where('date', '==', todayString)
+          .onSnapshot((attSnapshot) => {
+            if (!attSnapshot) return;
+            attendanceDataMap = {};
+            attSnapshot.docs.forEach((doc) => {
+              const data = doc.data();
+              if (employeeIds.includes(data.employeeId)) {
+                attendanceDataMap[data.employeeId] = {
+                  checkIn: data.checkIn && typeof data.checkIn.toDate === 'function' ? data.checkIn.toDate() : null,
+                  checkOut: data.checkOut && typeof data.checkOut.toDate === 'function' ? data.checkOut.toDate() : null,
+                  checkInAddress: data.checkInAddress || '',
+                  checkOutAddress: data.checkOutAddress || '',
+                  status: data.status,
+                };
+              }
+            });
+            mergeAndSet();
+          }, (err) => {
+            console.warn('Attendance query snapshot error:', err);
+          });
+
+        // 3. Subscribe to RTDB Status updates
+        const rtdbRef = database().ref('/status/users');
+        if (rtdbListener) {
+          rtdbRef.off('value', rtdbListener);
+        }
+
+        rtdbListener = rtdbRef.on(
+          'value',
+          (rtdbSnapshot) => {
+            rtdbDataVal = rtdbSnapshot.val() || {};
+            mergeAndSet();
+          },
+          (rtdbError) => {
+            console.error('RTDB Status listener error:', rtdbError);
+          }
+        );
+      },
+      (error) => {
+        console.error('Firestore users query error:', error);
+        setLoading(false);
+      }
+    );
 
     return () => {
       unsubscribeFirestore();
+      unsubscribeAttendance();
       if (rtdbListener) {
         database().ref('/status/users').off('value', rtdbListener);
       }
@@ -168,12 +219,6 @@ export const RealTimeStatusScreen: React.FC = () => {
       if (item.checkInStatus === 'checked-in') return 'Checked In';
       if (item.checkInStatus === 'checked-out') return 'Checked Out';
       return 'Not Logged In';
-    };
-
-    const getBadgeType = () => {
-      if (item.checkInStatus === 'checked-in') return 'success';
-      if (item.checkInStatus === 'checked-out') return 'info';
-      return 'danger';
     };
 
     const getInitials = (name: string) => {
@@ -205,6 +250,42 @@ export const RealTimeStatusScreen: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        {(item.checkInTime || item.checkOutTime) ? (
+          <View style={styles.attendanceDetailsContainer}>
+            {item.checkInTime ? (
+              <View style={styles.attendanceRow}>
+                <View style={styles.timeLabelContainer}>
+                  <Icon name="log-in-outline" size={14} color={COLORS.success} />
+                  <Text style={styles.timeLabel}>Checked In: {formatTime(item.checkInTime)}</Text>
+                </View>
+                {item.checkInAddress ? (
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    {item.checkInAddress}
+                  </Text>
+                ) : (
+                  <Text style={styles.addressText}>Address not logged</Text>
+                )}
+              </View>
+            ) : null}
+
+            {item.checkOutTime ? (
+              <View style={[styles.attendanceRow, { marginTop: 6, borderTopWidth: 1, borderTopColor: COLORS.border + '30', paddingTop: 6 }]}>
+                <View style={styles.timeLabelContainer}>
+                  <Icon name="log-out-outline" size={14} color={COLORS.info} />
+                  <Text style={styles.timeLabel}>Checked Out: {formatTime(item.checkOutTime)}</Text>
+                </View>
+                {item.checkOutAddress ? (
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    {item.checkOutAddress}
+                  </Text>
+                ) : (
+                  <Text style={styles.addressText}>Address not logged</Text>
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.cardFooter}>
           <View style={styles.footerItem}>
@@ -403,5 +484,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 8,
+  },
+  attendanceDetailsContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  attendanceRow: {
+    flexDirection: 'column',
+  },
+  timeLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginLeft: 4,
+  },
+  addressText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginLeft: 18,
+    lineHeight: 15,
   },
 });

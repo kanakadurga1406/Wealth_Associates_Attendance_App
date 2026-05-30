@@ -118,22 +118,20 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-      if (!emailVal.trim()) {
-        showAlert('Validation Error', 'Email address is required.');
-        return;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailVal.trim())) {
-        showAlert('Validation Error', 'Please enter a valid email address.');
-        return;
-      }
+    if (!emailVal.trim()) {
+      showAlert('Validation Error', 'Email address is required.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailVal.trim())) {
+      showAlert('Validation Error', 'Please enter a valid email address.');
+      return;
     }
 
     setSaving(true);
     try {
-      // 1. If email changed and is ADMIN/SUPER_ADMIN, update Firebase Auth email
-      const isEmailChanged = (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && emailVal.trim().toLowerCase() !== user.email.toLowerCase();
+      // 1. If email changed, update Firebase Auth email
+      const isEmailChanged = emailVal.trim().toLowerCase() !== user.email.toLowerCase();
       
       if (isEmailChanged) {
         const currentUser = auth().currentUser;
@@ -324,16 +322,14 @@ export const Header: React.FC<HeaderProps> = ({
                             autoCorrect={false}
                           />
 
-                          {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
-                            <Input
-                              label="Email Address"
-                              value={emailVal}
-                              onChangeText={setEmailVal}
-                              keyboardType="email-address"
-                              autoCapitalize="none"
-                              autoCorrect={false}
-                            />
-                          )}
+                          <Input
+                            label="Email Address"
+                            value={emailVal}
+                            onChangeText={setEmailVal}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                          />
 
                           {user?.role === 'EMPLOYEE' && (
                             <Input

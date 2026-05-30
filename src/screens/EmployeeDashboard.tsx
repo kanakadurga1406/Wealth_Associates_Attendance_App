@@ -40,6 +40,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
   const dispatch = useDispatch();
   const { updateActivity } = useRealTimeStatus();
@@ -224,6 +225,20 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
         console.warn('Notifications subscription error:', err);
       });
 
+    // 6. Subscribe to current month's payroll payment status
+    const unsubscribePayment = firestore()
+      .collection('payroll_payments')
+      .doc(`${user.uid}_${currentMonthPrefix}`)
+      .onSnapshot((doc) => {
+        if (doc.exists()) {
+          setPaymentDetails(doc.data());
+        } else {
+          setPaymentDetails(null);
+        }
+      }, (err) => {
+        console.warn('Error fetching payroll payment status:', err);
+      });
+
     return () => {
       unsubscribeEmp();
       unsubscribeToday();
@@ -231,6 +246,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
       unsubscribeLeaves();
       unsubscribeLogs();
       unsubscribeNotifications();
+      unsubscribePayment();
     };
   }, [user, dispatch]);
 
@@ -450,6 +466,23 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
               <View style={[styles.salaryRow, { marginTop: 4 }]}>
                 <Text style={styles.remainingSalaryLabel}>Remaining Net Salary</Text>
                 <Text style={styles.remainingSalaryValue}>₹{salaryData.remainingSalary.toFixed(2)}</Text>
+              </View>
+
+              <View style={styles.dividerHorizontalLine} />
+
+              <View style={[styles.salaryRow, { marginTop: 4, alignItems: 'center' }]}>
+                <Text style={styles.paymentStatusLabel}>Payment Status</Text>
+                {paymentDetails?.status === 'Paid' ? (
+                  <View style={styles.paidBadge}>
+                    <Text style={styles.paidBadgeText}>
+                      Paid via {paymentDetails.paymentMethod}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.unpaidBadge}>
+                    <Text style={styles.unpaidBadgeText}>Unpaid</Text>
+                  </View>
+                )}
               </View>
             </View>
           </Card>
@@ -846,5 +879,32 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 18,
     paddingLeft: 26,
+  },
+  paymentStatusLabel: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: '700',
+  },
+  paidBadge: {
+    backgroundColor: COLORS.successLight || 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  paidBadgeText: {
+    color: COLORS.success,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  unpaidBadge: {
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  unpaidBadgeText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
