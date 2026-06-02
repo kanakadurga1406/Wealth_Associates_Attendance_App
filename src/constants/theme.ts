@@ -1,32 +1,32 @@
 export const COLORS = {
-  primary: '#4F46E5', // Slate Indigo
-  primaryLight: '#818CF8',
-  primaryDark: '#3730A3',
+  primary: '#2563EB', // Professional Royal Blue
+  primaryLight: '#60A5FA', // Light sky blue
+  primaryDark: '#1E40AF', // Deep navy
   
-  secondary: '#06B6D4', // Teal Blue
-  secondaryLight: '#67E8F9',
+  secondary: '#0F766E', // Teal Slate
+  secondaryLight: '#14B8A6', // Teal Light
   
-  background: '#F9FAFB', // Off-white
+  background: '#F8FAFC', // Slate 50
   surface: '#FFFFFF', // Pure White
   surfaceCard: '#FFFFFF',
   
-  text: '#111827', // Gray 900
-  textSecondary: '#6B7280', // Gray 500
-  textLight: '#9CA3AF', // Gray 400
+  text: '#0F172A', // Slate 900 (High contrast)
+  textSecondary: '#475569', // Slate 600 (Subtitles, body)
+  textLight: '#64748B', // Slate 500 (Muted labels)
   
-  border: '#E5E7EB', // Gray 200
+  border: '#E2E8F0', // Slate 200 (Clean divider/borders)
   
-  success: '#10B981', // Emerald Green
-  successLight: '#D1FAE5',
+  success: '#0D9488', // Emerald Teal
+  successLight: '#CCFBF1', // 100
   
-  danger: '#EF4444', // Red
-  dangerLight: '#FEE2E2',
+  danger: '#E11D48', // Rose Red
+  dangerLight: '#FFE4E6', // 100
   
-  warning: '#F59E0B', // Amber Yellow
-  warningLight: '#FEF3C7',
+  warning: '#D97706', // Amber Yellow
+  warningLight: '#FEF3C7', // 100
   
-  info: '#3B82F6', // Blue
-  infoLight: '#DBEAFE',
+  info: '#2563EB', // Blue
+  infoLight: '#EFF6FF', // 100
 
   // Dark Mode colors
   dark: {
@@ -50,24 +50,24 @@ export const SPACING = {
 
 export const SHADOWS = {
   sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     elevation: 2,
   },
   md: {
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
     elevation: 8,
   },
 };
@@ -77,3 +77,4 @@ export const FONTS = {
   medium: 'System',
   regular: 'System',
 };
+

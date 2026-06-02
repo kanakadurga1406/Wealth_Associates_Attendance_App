@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import DeviceInfo from 'react-native-device-info';
+import messaging from '@react-native-firebase/messaging';
 
 import { store, RootState } from './src/redux/store';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -19,7 +20,54 @@ const RootAppContent: React.FC = () => {
   const dispatch = useDispatch();
   const { loading } = useSelector((state: RootState) => state.auth);
   const { showAlert } = useCustomAlert();
-  
+
+  const requestUserPermission = async () => {
+    try {
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (enabled) {
+        console.log('Authorization status:', authStatus);
+        return true;
+      }
+    } catch (e) {
+      console.warn('FCM Permission Request error:', e);
+    }
+    return false;
+  };
+
+  const getFcmToken = async (uid: string) => {
+    try {
+      const hasPermission = await requestUserPermission();
+      if (!hasPermission) return;
+
+      const fcmToken = await messaging().getToken();
+      if (fcmToken) {
+        await firestore().collection('users').doc(uid).update({
+          fcmToken,
+        });
+        console.log('Saved FCM Token to Firestore:', fcmToken);
+      }
+    } catch (e) {
+      console.warn('Failed to get/save FCM token:', e);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
+      console.log('A new FCM message arrived in foreground!', remoteMessage);
+      const title = remoteMessage.notification?.title || 'Notification';
+      const body = remoteMessage.notification?.body || '';
+      showAlert(title, body);
+    });
+
+    return () => {
+      unsubscribeForeground();
+    };
+  }, [showAlert]);
+
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | null = null;
 
@@ -42,7 +90,7 @@ const RootAppContent: React.FC = () => {
             async (docSnapshot) => {
               if (docSnapshot && docSnapshot.exists()) {
                 const data = docSnapshot.data();
-                
+
                 // 1. If user is blocked, force sign out immediately
                 if (data?.status === 'blocked') {
                   await auth().signOut();
@@ -109,6 +157,23 @@ const RootAppContent: React.FC = () => {
                               status: 'unread',
                               createdAt: firestore.FieldValue.serverTimestamp(),
                             });
+                          } else {
+                            // Find all Super Admins and notify them
+                            const superAdminsSnap = await firestore()
+                              .collection('users')
+                              .where('role', '==', 'SUPER_ADMIN')
+                              .get();
+                            
+                            const promises = superAdminsSnap.docs.map(doc => 
+                              firestore().collection('notifications').add({
+                                employeeId: doc.id,
+                                title: 'Device Approval Request',
+                                body: `${data.name || 'User'} requested login approval on a new device.`,
+                                status: 'unread',
+                                createdAt: firestore.FieldValue.serverTimestamp(),
+                              })
+                            );
+                            await Promise.all(promises);
                           }
                         }
                       } catch (dbErr) {
@@ -139,7 +204,8 @@ const RootAppContent: React.FC = () => {
                 // If role is EMPLOYEE, fetch employee-specific fields
                 let department = '';
                 let phone = '';
-                
+                let adminId = data?.adminId || '';
+
                 if (data?.role === 'EMPLOYEE') {
                   try {
                     const empSnap = await firestore().collection('employees').doc(firebaseUser.uid).get();
@@ -147,6 +213,9 @@ const RootAppContent: React.FC = () => {
                       const empData = empSnap.data();
                       department = empData?.department || 'General';
                       phone = empData?.phone || '';
+                      if (!adminId) {
+                        adminId = empData?.adminId || '';
+                      }
                     }
                   } catch (e) {
                     console.warn('Error fetching secondary employee details:', e);
@@ -161,9 +230,11 @@ const RootAppContent: React.FC = () => {
                   status: data?.status || 'active',
                   department,
                   phone,
+                  adminId,
                 };
-                
+
                 dispatch(setUser(userProfile));
+                getFcmToken(firebaseUser.uid);
               } else {
                 // authenticated but profile doesn't exist in registry
                 dispatch(setUser(null));

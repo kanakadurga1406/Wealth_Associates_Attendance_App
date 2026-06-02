@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createUserAccount = exports.triggerAutoMarkAbsent = exports.markAttendance = void 0;
+exports.onNotificationCreated = exports.createUserAccount = exports.triggerAutoMarkAbsent = exports.markAttendance = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -326,7 +326,15 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
         }
-        // 5. Log activity
+        // 5. Create Welcome Notification
+        await db.collection("notifications").add({
+            employeeId: newUid,
+            title: "Welcome to Wealth Attendance",
+            body: `Welcome ${name}! Your ${role === "ADMIN" ? "Admin" : "Employee"} account has been successfully created.`,
+            status: "unread",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        // 6. Log activity
         await db.collection("activity_logs").add({
             employeeId: callerUid,
             activity: `Created user account: ${name} (${role})`,
@@ -341,6 +349,70 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
     catch (error) {
         console.error("createUserAccount error:", error);
         throw new functions.https.HttpsError("internal", error.message || "Failed to create user account.");
+    }
+});
+/**
+ * onNotificationCreated Firestore Trigger
+ * Sends a push notification via Firebase Cloud Messaging (FCM) when a new notification is added.
+ */
+exports.onNotificationCreated = functions.firestore
+    .document("notifications/{notificationId}")
+    .onCreate(async (snapshot) => {
+    const data = snapshot.data();
+    if (!data)
+        return;
+    const recipientUid = data.employeeId;
+    const title = data.title || "Notification";
+    const body = data.body || "";
+    if (!recipientUid) {
+        console.warn("Notification document lacks employeeId:", snapshot.id);
+        return;
+    }
+    try {
+        // 1. Fetch the recipient's user document to get their fcmToken
+        const userDoc = await db.collection("users").doc(recipientUid).get();
+        if (!userDoc.exists) {
+            console.warn("Recipient user document not found for uid:", recipientUid);
+            return;
+        }
+        const userData = userDoc.data();
+        const fcmToken = userData?.fcmToken;
+        if (!fcmToken) {
+            console.log(`Recipient ${recipientUid} has no registered fcmToken. Skipping push notification.`);
+            return;
+        }
+        // 2. Build the FCM message payload
+        const message = {
+            token: fcmToken,
+            notification: {
+                title: title,
+                body: body,
+            },
+            data: {
+                notificationId: snapshot.id,
+            },
+            android: {
+                priority: "high",
+                notification: {
+                    sound: "default",
+                    defaultSound: true,
+                },
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        sound: "default",
+                        badge: 1,
+                    },
+                },
+            },
+        };
+        // 3. Send the notification via admin messaging SDK
+        const response = await admin.messaging().send(message);
+        console.log(`Successfully sent push notification to user ${recipientUid}:`, response);
+    }
+    catch (error) {
+        console.error("Error sending push notification for notification:", snapshot.id, error);
     }
 });
 //# sourceMappingURL=index.js.map

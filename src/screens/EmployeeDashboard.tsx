@@ -491,15 +491,15 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
         {/* Dashboard Grid */}
         <Text style={styles.sectionTitle}>Monthly Metrics (IST)</Text>
         <View style={styles.statsContainer}>
-          <Card style={styles.statItem}>
+          <Card style={[styles.statItem, { borderTopColor: COLORS.success }]}>
             <Text style={[styles.statNum, { color: COLORS.success }]}>{stats.present}</Text>
             <Text style={styles.statLabel}>Present</Text>
           </Card>
-          <Card style={styles.statItem}>
+          <Card style={[styles.statItem, { borderTopColor: COLORS.warning }]}>
             <Text style={[styles.statNum, { color: COLORS.warning }]}>{stats.late}</Text>
             <Text style={styles.statLabel}>Late Logins</Text>
           </Card>
-          <Card style={styles.statItem}>
+          <Card style={[styles.statItem, { borderTopColor: COLORS.danger }]}>
             <Text style={[styles.statNum, { color: COLORS.danger }]}>{stats.absent}</Text>
             <Text style={styles.statLabel}>Absent</Text>
           </Card>
@@ -589,19 +589,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
   loadingText: {
     marginTop: 12,
     color: COLORS.textSecondary,
     fontSize: 14,
+    fontWeight: '600',
   },
   scrollContainer: {
     padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   statusCard: {
     padding: SPACING.md,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.xs,
     marginBottom: SPACING.md,
+    backgroundColor: COLORS.surface,
   },
   statusHeader: {
     flexDirection: 'row',
@@ -609,11 +613,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   statusIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   statusDetails: {
     flex: 1,
@@ -627,30 +633,32 @@ const styles = StyleSheet.create({
   statusSub: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '600',
   },
   actionButton: {
-    height: 44,
-    borderRadius: 8,
+    height: 48,
+    borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    ...SHADOWS.sm,
   },
   btnIcon: {
-    marginRight: 6,
-  },
-  actionButtonDisabled: {
-    backgroundColor: COLORS.border,
+    marginRight: 8,
   },
   actionBtnText: {
     color: COLORS.surface,
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginTop: SPACING.sm,
     marginBottom: SPACING.sm,
   },
@@ -664,16 +672,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     alignItems: 'center',
     paddingVertical: SPACING.md,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 4,
+    borderColor: COLORS.border,
   },
   statNum: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   leaveStatsContainer: {
     flexDirection: 'row',
@@ -682,38 +696,43 @@ const styles = StyleSheet.create({
   },
   leaveStatItem: {
     width: '48%',
-    padding: SPACING.sm,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
   },
   leaveRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   leaveIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.infoLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   leaveNum: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: COLORS.text,
   },
   leaveLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginTop: 2,
   },
   menuContainer: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: SPACING.md,
     overflow: 'hidden',
+    ...SHADOWS.sm,
   },
   menuItem: {
     flexDirection: 'row',
@@ -723,9 +742,9 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
@@ -739,6 +758,7 @@ const styles = StyleSheet.create({
   logsCard: {
     padding: SPACING.md,
     marginBottom: SPACING.lg,
+    backgroundColor: COLORS.surface,
   },
   logRow: {
     flexDirection: 'row',
@@ -747,8 +767,8 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   logIcon: {
-    marginTop: 2,
-    marginRight: 8,
+    marginTop: 4,
+    marginRight: 10,
   },
   logContent: {
     flex: 1,
@@ -756,34 +776,41 @@ const styles = StyleSheet.create({
   logText: {
     fontSize: 13,
     color: COLORS.text,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   logTime: {
     fontSize: 10,
     color: COLORS.textLight,
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '600',
   },
   emptyLogs: {
     fontSize: 13,
     color: COLORS.textSecondary,
     textAlign: 'center',
     paddingVertical: SPACING.md,
+    fontWeight: '600',
   },
   salaryCard: {
     padding: SPACING.md,
     marginBottom: SPACING.md,
+    backgroundColor: COLORS.surface,
   },
   salaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   salaryIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.sm,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   salaryTitleContainer: {
     flex: 1,
@@ -797,6 +824,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
+    fontWeight: '600',
   },
   salaryDetails: {
     marginTop: SPACING.xs,
@@ -805,12 +833,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   salaryLabel: {
     fontSize: 14,
     color: COLORS.text,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   salaryValue: {
     fontSize: 14,
@@ -821,16 +849,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
   deductionLabel: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   deductionValue: {
     fontSize: 12,
     color: COLORS.danger,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   remainingSalaryLabel: {
     fontSize: 15,
@@ -845,15 +874,16 @@ const styles = StyleSheet.create({
   dividerHorizontalLine: {
     height: 1,
     backgroundColor: COLORS.border,
-    marginVertical: 8,
+    marginVertical: 10,
   },
   notificationCard: {
     backgroundColor: COLORS.surface,
     padding: SPACING.md,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
     marginBottom: SPACING.md,
     marginTop: SPACING.xs,
+    borderRadius: 16,
+    ...SHADOWS.sm,
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -869,7 +899,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.text,
-    marginLeft: 6,
+    marginLeft: 8,
   },
   dismissBtn: {
     padding: 2,
@@ -878,7 +908,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     lineHeight: 18,
-    paddingLeft: 26,
+    paddingLeft: 28,
+    fontWeight: '600',
   },
   paymentStatusLabel: {
     fontSize: 14,
@@ -886,10 +917,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   paidBadge: {
-    backgroundColor: COLORS.successLight || 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: COLORS.successLight || 'rgba(13, 148, 136, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   paidBadgeText: {
     color: COLORS.success,
@@ -897,10 +928,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   unpaidBadge: {
-    backgroundColor: 'rgba(107, 114, 128, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: 'rgba(100, 116, 139, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   unpaidBadgeText: {
     color: COLORS.textSecondary,

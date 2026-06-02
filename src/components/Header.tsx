@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../redux/store';
 import { useCustomAlert } from '../context/CustomAlertContext';
@@ -230,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
       <View style={styles.headerRow}>
         
         {/* Left Side: Back button + Logo + Title */}
@@ -424,12 +424,13 @@ export const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
     paddingTop: 36, // Increased top padding for status bar clearance
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -448,14 +449,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: COLORS.text,
+    letterSpacing: 0.1,
   },
   subtitle: {
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
+    fontWeight: '600',
   },
   backButton: {
     marginRight: SPACING.sm,
@@ -464,8 +467,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 36, // Increased logo size from 28
-    height: 36, // Increased logo size from 28
+    width: 32,
+    height: 32,
     marginRight: SPACING.sm,
     resizeMode: 'contain',
   },
@@ -476,16 +479,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs,
   },
   profileRoleText: {
-    fontSize: 8.5,
+    fontSize: 9,
     fontWeight: '800',
-    color: COLORS.textSecondary,
+    color: COLORS.primary,
     marginTop: 2,
     textAlign: 'center',
   },
   // Modal Backdrop and Wrapper
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)', // Sleek dark slate tint backdrop
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -497,15 +500,15 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: 16,
+    borderRadius: 24,
     width: '92%',
     maxHeight: '80%',
-    padding: SPACING.md,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    padding: SPACING.lg,
+    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -515,32 +518,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    paddingBottom: SPACING.sm,
+    paddingBottom: SPACING.md,
     marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: COLORS.text,
+    letterSpacing: 0.2,
   },
   scrollContent: {
     paddingBottom: SPACING.md,
   },
   avatarSection: {
     alignItems: 'center',
-    marginVertical: SPACING.sm,
+    marginVertical: SPACING.md,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: COLORS.primaryLight + '22',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: COLORS.primary + '10', // Soft primary tint
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.sm,
+    borderWidth: 2,
+    borderColor: COLORS.primary + '30',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '800',
     color: COLORS.primary,
   },
@@ -552,8 +558,13 @@ const styles = StyleSheet.create({
   userRole: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginTop: 2,
-    fontWeight: '600',
+    marginTop: 4,
+    fontWeight: '700',
+    backgroundColor: COLORS.primary + '10',
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   formSection: {
     marginTop: SPACING.md,
@@ -563,18 +574,20 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    paddingBottom: SPACING.xs,
+    paddingBottom: SPACING.sm,
   },
   infoLabel: {
     fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
+    color: COLORS.textLight,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
-    marginTop: 2,
+    marginTop: 4,
   },
   modalActions: {
     flexDirection: 'row',
@@ -585,7 +598,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    height: 44,
+    height: 48,
   },
   loadingContainer: {
     paddingVertical: SPACING.xl,

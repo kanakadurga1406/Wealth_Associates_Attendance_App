@@ -126,6 +126,28 @@ export const OfficeLocationScreen: React.FC<{ navigation: any }> = ({ navigation
         setDocId(newDoc.id);
       }
 
+      // Notify all employees under this Admin about the geofence update
+      const employeesSnapshot = await firestore()
+        .collection('users')
+        .where('role', '==', 'EMPLOYEE')
+        .where('adminId', '==', adminUser.uid)
+        .get();
+
+      if (!employeesSnapshot.empty) {
+        const batch = firestore().batch();
+        employeesSnapshot.docs.forEach((doc) => {
+          const notificationRef = firestore().collection('notifications').doc();
+          batch.set(notificationRef, {
+            employeeId: doc.id,
+            title: 'Geofence Boundary Updated',
+            body: `Your Admin has updated the office geofence parameters. New radius: ${radNum} meters.`,
+            status: 'unread',
+            createdAt: firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+
       setSaveSuccess(true);
       showAlert('Success', 'Office location & geofence parameters saved successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() }

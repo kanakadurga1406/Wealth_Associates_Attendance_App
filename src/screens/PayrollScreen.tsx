@@ -88,6 +88,15 @@ export const PayrollScreen: React.FC = () => {
         paidBy: adminUser?.uid || 'system',
       });
 
+      // Send notification to employee
+      await firestore().collection('notifications').add({
+        employeeId: selectedEmployee.uid,
+        title: 'Salary Disbursed',
+        body: `Your salary of ₹${selectedEmployee.netPay} for the month of ${currentMonthPrefix} has been marked as Paid via ${selectedPaymentMethod}.`,
+        status: 'unread',
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      });
+
       setPaymentModalVisible(false);
       setSelectedEmployee(null);
       showAlert('Success', `Salary paid successfully via ${selectedPaymentMethod} to ${selectedEmployee.name}.`);

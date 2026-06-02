@@ -12,7 +12,7 @@ import database from '@react-native-firebase/database';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutSuccess } from '../redux/slices/authSlice';
 import { RootState } from '../redux/store';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { Card } from '../components/Card';
 import { Header } from '../components/Header';
 import { StatusBadge } from '../components/StatusBadge';
@@ -176,7 +176,7 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
         <Text style={styles.sectionTitle}>System Directory Stats</Text>
         <View style={styles.metricsRow}>
           <Card style={[styles.metricCard, styles.cardPremium, { borderColor: COLORS.primary }]}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#EEF2F6' }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: COLORS.primary + '10' }]}>
               <Icon name="shield-checkmark" size={20} color={COLORS.primary} />
             </View>
             <Text style={styles.metricNumber}>{stats.admins}</Text>
@@ -184,7 +184,7 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
           </Card>
 
           <Card style={[styles.metricCard, styles.cardPremium, { borderColor: COLORS.secondary }]}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#F5E6FE' }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: COLORS.secondary + '10' }]}>
               <Icon name="people" size={20} color={COLORS.secondary} />
             </View>
             <Text style={styles.metricNumber}>{stats.employees}</Text>
@@ -192,7 +192,7 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
           </Card>
 
           <Card style={[styles.metricCard, styles.cardPremium, { borderColor: COLORS.success }]}>
-            <View style={[styles.iconWrapper, { backgroundColor: '#E8F5E9' }]}>
+            <View style={[styles.iconWrapper, { backgroundColor: COLORS.success + '10' }]}>
               <Icon name="pulse" size={20} color={COLORS.success} />
             </View>
             <Text style={styles.metricNumber}>{stats.online}</Text>
@@ -231,8 +231,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('CreateAdmin')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#E0F7FA' }]}>
-                <Icon name="person-add" size={22} color="#00838F" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.primary + '10' }]}>
+                <Icon name="person-add" size={22} color={COLORS.primary} />
               </View>
               <Text style={styles.menuLabel}>Create Admin</Text>
             </TouchableOpacity>
@@ -241,8 +241,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('AdminsList')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#EDE7F6' }]}>
-                <Icon name="shield-checkmark" size={22} color="#4527A0" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.secondary + '10' }]}>
+                <Icon name="shield-checkmark" size={22} color={COLORS.secondary} />
               </View>
               <Text style={styles.menuLabel}>Manage Admins</Text>
             </TouchableOpacity>
@@ -259,8 +259,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('CreateEmployee')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#E3F2FD' }]}>
-                <Icon name="person-add-outline" size={22} color="#1565C0" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.primary + '10' }]}>
+                <Icon name="person-add-outline" size={22} color={COLORS.primary} />
               </View>
               <Text style={styles.menuLabel}>Add Employee</Text>
             </TouchableOpacity>
@@ -269,8 +269,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('EmployeesList')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#ECEFF1' }]}>
-                <Icon name="people-outline" size={22} color="#37474F" />
+              <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(100, 116, 139, 0.1)' }]}>
+                <Icon name="people-outline" size={22} color={COLORS.textSecondary} />
               </View>
               <Text style={styles.menuLabel}>View Employees</Text>
             </TouchableOpacity>
@@ -279,8 +279,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('RealTimeStatus')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                <Icon name="radio" size={22} color="#2E7D32" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.success + '10' }]}>
+                <Icon name="radio" size={22} color={COLORS.success} />
               </View>
               <Text style={styles.menuLabel}>Live Status</Text>
             </TouchableOpacity>
@@ -289,8 +289,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('OfficeLocation')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FFFDE7' }]}>
-                <Icon name="location-outline" size={22} color="#F57F17" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.warning + '10' }]}>
+                <Icon name="location-outline" size={22} color={COLORS.warning} />
               </View>
               <Text style={styles.menuLabel}>Set Geofence</Text>
             </TouchableOpacity>
@@ -299,8 +299,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('LeaveApprovals')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#FFF3E0' }]}>
-                <Icon name="mail-unread-outline" size={22} color="#E65100" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.danger + '10' }]}>
+                <Icon name="mail-unread-outline" size={22} color={COLORS.danger} />
                 {stats.pendingLeaves > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{stats.pendingLeaves}</Text>
@@ -314,8 +314,8 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('Payroll')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                <Icon name="cash-outline" size={22} color="#2E7D32" />
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.success + '10' }]}>
+                <Icon name="cash-outline" size={22} color={COLORS.success} />
               </View>
               <Text style={styles.menuLabel}>Payroll Overview</Text>
             </TouchableOpacity>
@@ -324,7 +324,7 @@ export const SuperAdminDashboard: React.FC<{ navigation: any }> = ({ navigation 
               style={styles.menuItem}
               onPress={() => navigation.navigate('DeviceApprovals')}
             >
-              <View style={[styles.menuIconContainer, { backgroundColor: '#F5E6FE' }]}>
+              <View style={[styles.menuIconContainer, { backgroundColor: COLORS.secondary + '10' }]}>
                 <Icon name="hardware-chip-outline" size={22} color={COLORS.secondary} />
                 {stats.pendingDevices > 0 && (
                   <View style={styles.badge}>
@@ -351,12 +351,13 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xl,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
     marginTop: SPACING.md,
-    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -368,15 +369,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: COLORS.surface,
   },
   cardPremium: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...SHADOWS.sm,
   },
   iconWrapper: {
     width: 38,
@@ -397,11 +395,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: '700',
     marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   overviewCard: {
     paddingVertical: SPACING.md,
-    borderRadius: 14,
+    borderRadius: 16,
     marginBottom: SPACING.xs,
+    backgroundColor: COLORS.surface,
   },
   overviewRow: {
     flexDirection: 'row',
@@ -419,8 +420,10 @@ const styles = StyleSheet.create({
   overviewLabel: {
     fontSize: 11,
     color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   dividerVertical: {
     width: 1,
@@ -434,8 +437,9 @@ const styles = StyleSheet.create({
   },
   consoleCard: {
     padding: SPACING.md,
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: SPACING.xs,
+    backgroundColor: COLORS.surface,
   },
   consoleSubtitle: {
     fontSize: 12,
@@ -458,13 +462,13 @@ const styles = StyleSheet.create({
   menuIconContainer: {
     width: 52,
     height: 52,
-    borderRadius: 14,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xs,
     position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   menuLabel: {
     fontSize: 10.5,
@@ -472,18 +476,19 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
     marginTop: 4,
+    lineHeight: 14,
   },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -4,
+    right: -4,
     backgroundColor: COLORS.danger,
     width: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: COLORS.surface,
   },
   badgeText: {
@@ -557,5 +562,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     paddingVertical: SPACING.lg,
+    fontWeight: '600',
   },
 });

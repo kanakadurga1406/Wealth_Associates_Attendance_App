@@ -11,7 +11,7 @@ import firestore from '@react-native-firebase/firestore';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutSuccess } from '../redux/slices/authSlice';
 import { RootState } from '../redux/store';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { Card } from '../components/Card';
 import { Header } from '../components/Header';
 import { formatTime } from '../utils/helpers';
@@ -138,17 +138,17 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
         {/* Statistics Grid */}
         <Text style={styles.sectionTitle}>Today's Overview</Text>
         <View style={styles.statsContainer}>
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { borderTopColor: COLORS.success }]}>
             <Text style={[styles.statNumber, { color: COLORS.success }]}>{stats.present}</Text>
             <Text style={styles.statLabel}>Present</Text>
           </Card>
           
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { borderTopColor: COLORS.warning }]}>
             <Text style={[styles.statNumber, { color: COLORS.warning }]}>{stats.late}</Text>
             <Text style={styles.statLabel}>Late Logins</Text>
           </Card>
 
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { borderTopColor: COLORS.danger }]}>
             <Text style={[styles.statNumber, { color: COLORS.danger }]}>{stats.absent}</Text>
             <Text style={styles.statLabel}>Absent</Text>
           </Card>
@@ -249,33 +249,43 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
-    color: COLORS.text,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: SPACING.sm,
     marginTop: SPACING.md,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: SPACING.md,
   },
   statCard: {
     flex: 1,
     marginHorizontal: 4,
     alignItems: 'center',
     paddingVertical: SPACING.md,
+    borderRadius: 16,
+    borderTopWidth: 4,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: '900',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textSecondary,
-    fontWeight: '600',
-    marginTop: SPACING.xs,
+    fontWeight: '700',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   menuGrid: {
     flexDirection: 'row',
@@ -286,26 +296,24 @@ const styles = StyleSheet.create({
   menuItem: {
     width: '31%',
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: SPACING.md,
     alignItems: 'center',
     marginBottom: SPACING.md,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
     borderWidth: 1,
     borderColor: COLORS.border,
+    ...SHADOWS.sm,
   },
   menuIconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xs,
     position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   menuLabel: {
     fontSize: 11,
@@ -313,21 +321,24 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
     marginTop: SPACING.xs,
+    lineHeight: 14,
   },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: -4,
+    right: -4,
     backgroundColor: COLORS.danger,
     width: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.surface,
   },
   badgeText: {
     color: COLORS.surface,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
   },
   emptyText: {
@@ -335,5 +346,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     paddingVertical: SPACING.md,
+    fontWeight: '600',
   },
 });

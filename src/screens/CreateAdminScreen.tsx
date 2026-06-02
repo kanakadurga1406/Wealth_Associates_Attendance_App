@@ -19,6 +19,7 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import axios from 'axios';
 import { COLORS, SPACING } from '../constants/theme';
+import { useNavigation } from '@react-navigation/native';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Header } from '../components/Header';
@@ -35,6 +36,7 @@ interface AssemblyItem {
 }
 
 export const CreateAdminScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,6 +83,7 @@ export const CreateAdminScreen: React.FC = () => {
     } catch (err: any) {
       console.warn('Error fetching locations:', err);
       setErrorLocations('Failed to load locations. Tap here to retry.');
+      showAlert('Connection Error', 'Failed to retrieve admin locations. Please check your internet connection and try again.');
     } finally {
       setLoadingLocations(false);
     }
@@ -168,7 +171,9 @@ export const CreateAdminScreen: React.FC = () => {
       // 5. Clean up secondary app
       await secondaryApp.delete();
 
-      showAlert('Success', `Admin ${name} created successfully!`);
+      showAlert('Success', `Admin ${name} created successfully!`, [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
       setName('');
       setEmail('');
       setPassword('');

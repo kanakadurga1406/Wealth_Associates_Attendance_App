@@ -61,10 +61,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   inputContainer: {
     position: 'relative',
@@ -73,12 +74,12 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 48,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: SPACING.md,
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: 15,
     backgroundColor: COLORS.surface,
     width: '100%',
   },
@@ -98,6 +99,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.danger,
     marginTop: 4,
+    fontWeight: '600',
   },
 });
 

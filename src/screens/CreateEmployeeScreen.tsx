@@ -17,6 +17,7 @@ import firebase from '@react-native-firebase/app';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { COLORS, SPACING } from '../constants/theme';
+import { useNavigation } from '@react-navigation/native';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { Header } from '../components/Header';
@@ -32,6 +33,7 @@ interface AdminItem {
 }
 
 export const CreateEmployeeScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -261,7 +263,9 @@ export const CreateEmployeeScreen: React.FC = () => {
       // 6. Clean up secondary app
       await secondaryApp.delete();
 
-      showAlert('Success', `Employee ${name} added successfully!`);
+      showAlert('Success', `Employee ${name} added successfully!`, [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
       setName('');
       setEmail('');
       setPassword('');

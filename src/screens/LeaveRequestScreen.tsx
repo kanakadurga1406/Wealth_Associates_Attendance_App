@@ -188,6 +188,34 @@ export const LeaveRequestScreen: React.FC<{ navigation: any }> = ({ navigation }
         timestamp: firestore.FieldValue.serverTimestamp(),
       });
 
+      // 3. Notify Admin manager about the new leave request
+      if (user.adminId) {
+        await firestore().collection('notifications').add({
+          employeeId: user.adminId,
+          title: 'New Leave Request',
+          body: `${user.name} has submitted a leave request from ${cleanStart} to ${cleanEnd}.`,
+          status: 'unread',
+          createdAt: firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Query and notify all Super Admins
+        const superAdminsSnap = await firestore()
+          .collection('users')
+          .where('role', '==', 'SUPER_ADMIN')
+          .get();
+
+        const promises = superAdminsSnap.docs.map(doc =>
+          firestore().collection('notifications').add({
+            employeeId: doc.id,
+            title: 'New Leave Request',
+            body: `${user.name || 'An employee'} has submitted a leave request from ${cleanStart} to ${cleanEnd}.`,
+            status: 'unread',
+            createdAt: firestore.FieldValue.serverTimestamp(),
+          })
+        );
+        await Promise.all(promises);
+      }
+
       showAlert('Request Submitted', 'Your leave request has been submitted to your Admin for approval.', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);

@@ -24,15 +24,16 @@ export const Card: React.FC<CardProps> = ({ children, style, elevated = true, ..
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: SPACING.md,
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   elevated: {
     ...SHADOWS.sm,
   },
   border: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    // Border is handled by default card style for consistent corporate theme
   },
 });

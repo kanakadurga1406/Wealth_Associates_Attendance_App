@@ -15,8 +15,8 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const deltaLambda = (lon2 - lon1) * Math.PI / 180;
 
   const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-            Math.cos(phi1) * Math.cos(phi2) *
-            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    Math.cos(phi1) * Math.cos(phi2) *
+    Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c; // Distance in meters
@@ -132,7 +132,7 @@ export const markAttendance = functions.https.onCall(async (request) => {
       const istHours = (currentTime.getUTCHours() + 5 + Math.floor((currentTime.getUTCMinutes() + 30) / 60)) % 24;
       const istMinutes = (currentTime.getUTCMinutes() + 30) % 60;
       let status = "Present";
-      
+
       // Mark Late if after 09:15 AM
       if (istHours > 9 || (istHours === 9 && istMinutes > 15)) {
         status = "Late";
@@ -238,9 +238,9 @@ export const triggerAutoMarkAbsent = functions.https.onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Auth required.");
   }
-  
+
   const callerUid = request.auth.uid;
-  
+
   try {
     const callerDoc = await db.collection("users").doc(callerUid).get();
     const callerData = callerDoc.data();
@@ -249,7 +249,7 @@ export const triggerAutoMarkAbsent = functions.https.onCall(async (request) => {
     }
 
     const { dateString } = getISTDateString();
-    
+
     // Fetch all active employees
     let employeesQuery;
     if (callerData.role === "ADMIN") {
@@ -387,7 +387,16 @@ export const createUserAccount = functions.https.onCall(async (request) => {
       });
     }
 
-    // 5. Log activity
+    // 5. Create Welcome Notification
+    await db.collection("notifications").add({
+      employeeId: newUid,
+      title: "Welcome to Wealth Attendance",
+      body: `Welcome ${name}! Your ${role === "ADMIN" ? "Admin" : "Employee"} account has been successfully created.`,
+      status: "unread",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 6. Log activity
     await db.collection("activity_logs").add({
       employeeId: callerUid,
       activity: `Created user account: ${name} (${role})`,
@@ -407,3 +416,74 @@ export const createUserAccount = functions.https.onCall(async (request) => {
     );
   }
 });
+
+/**
+ * onNotificationCreated Firestore Trigger
+ * Sends a push notification via Firebase Cloud Messaging (FCM) when a new notification is added.
+ */
+export const onNotificationCreated = functions.firestore
+  .document("notifications/{notificationId}")
+  .onCreate(async (snapshot) => {
+    const data = snapshot.data();
+    if (!data) return;
+
+    const recipientUid = data.employeeId;
+    const title = data.title || "Notification";
+    const body = data.body || "";
+
+    if (!recipientUid) {
+      console.warn("Notification document lacks employeeId:", snapshot.id);
+      return;
+    }
+
+    try {
+      // 1. Fetch the recipient's user document to get their fcmToken
+      const userDoc = await db.collection("users").doc(recipientUid).get();
+      if (!userDoc.exists) {
+        console.warn("Recipient user document not found for uid:", recipientUid);
+        return;
+      }
+
+      const userData = userDoc.data();
+      const fcmToken = userData?.fcmToken;
+
+      if (!fcmToken) {
+        console.log(`Recipient ${recipientUid} has no registered fcmToken. Skipping push notification.`);
+        return;
+      }
+
+      // 2. Build the FCM message payload
+      const message: admin.messaging.Message = {
+        token: fcmToken,
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: {
+          notificationId: snapshot.id,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            sound: "default",
+            defaultSound: true,
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: "default",
+              badge: 1,
+            },
+          },
+        },
+      };
+
+      // 3. Send the notification via admin messaging SDK
+      const response = await admin.messaging().send(message);
+      console.log(`Successfully sent push notification to user ${recipientUid}:`, response);
+    } catch (error) {
+      console.error("Error sending push notification for notification:", snapshot.id, error);
+    }
+  });
+

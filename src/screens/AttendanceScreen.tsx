@@ -44,6 +44,15 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const hasTriggeredLogout = useRef(false);
   const [hasShownOutOfRangeAlert, setHasShownOutOfRangeAlert] = useState(false);
 
+  const handleLocationError = (errMessage: string) => {
+    setLocError((prev) => {
+      if (prev !== errMessage) {
+        showAlert('Location Services Error', `${errMessage}\n\nPlease check your device settings and try again.`);
+      }
+      return errMessage;
+    });
+  };
+
   useEffect(() => {
     updateActivity(isCheckIn ? 'marking_check_in' : 'marking_check_out');
   }, [updateActivity, isCheckIn]);
@@ -59,7 +68,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           setLocError(null);
         },
         (errMessage) => {
-          setLocError(errMessage);
+          handleLocationError(errMessage);
         }
       );
     }, 200);
@@ -76,7 +85,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       },
       (errMessage) => {
         if (active) {
-          setLocError(errMessage);
+          handleLocationError(errMessage);
         }
       }
     );
@@ -320,13 +329,31 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
       // Helper for IST Date
       const getISTDate = () => {
-        const utcDate = new Date();
-        const istDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-        const dateString = istDate.toISOString().split('T')[0];
-        return { dateString, currentTime: istDate };
+        const now = new Date();
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        });
+        const dateString = dateFormatter.format(now);
+
+        const timeFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Asia/Kolkata',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        });
+        const timeParts = timeFormatter.formatToParts(now);
+        const hoursPart = timeParts.find(p => p.type === 'hour')?.value;
+        const minutesPart = timeParts.find(p => p.type === 'minute')?.value;
+        const istHours = parseInt(hoursPart || '0', 10);
+        const istMinutes = parseInt(minutesPart || '0', 10);
+
+        return { dateString, currentTime: now, istHours, istMinutes };
       };
 
-      const { dateString, currentTime } = getISTDate();
+      const { dateString, currentTime, istHours, istMinutes } = getISTDate();
 
       // Check if attendance already exists
       const attendanceQuery = await firestore()
@@ -343,8 +370,6 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         }
 
         // Calculate if Late (past 9:15 AM IST)
-        const istHours = currentTime.getHours();
-        const istMinutes = currentTime.getMinutes();
         let status = 'Present';
         if (istHours > 9 || (istHours === 9 && istMinutes > 15)) {
           status = 'Late';
@@ -379,6 +404,17 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           checkInAddress: address,
           checkInTime: database.ServerValue.TIMESTAMP,
         });
+
+        // Notify Admin of Check-in
+        if (adminId) {
+          await firestore().collection('notifications').add({
+            employeeId: adminId,
+            title: 'Employee Checked In',
+            body: `${user?.name || 'Employee'} has checked in today with status: ${status}.`,
+            status: 'unread',
+            createdAt: firestore.FieldValue.serverTimestamp(),
+          });
+        }
 
         showAlert(
           'Success',
@@ -426,6 +462,17 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           checkOutAddress: address,
           checkOutTime: database.ServerValue.TIMESTAMP,
         });
+
+        // Notify Admin of Check-out
+        if (adminId) {
+          await firestore().collection('notifications').add({
+            employeeId: adminId,
+            title: 'Employee Checked Out',
+            body: `${user?.name || 'Employee'} has checked out today. Total hours: ${workingHours.toFixed(2)}h.`,
+            status: 'unread',
+            createdAt: firestore.FieldValue.serverTimestamp(),
+          });
+        }
 
         showAlert(
           'Success',
@@ -518,7 +565,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           ) : (
             <View style={styles.gpsError}>
               <Icon name="warning" size={24} color={COLORS.danger} />
-              <Text style={styles.errorText}>{locError || 'Unknown location validation error.'}</Text>
+              <Text style={styles.errorText}>GPS signal is currently unavailable. Please verify location settings.</Text>
             </View>
           )}
 
@@ -561,14 +608,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.lg,
     marginBottom: SPACING.md,
+    backgroundColor: COLORS.surface,
   },
   badge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,0,0,0.02)',
   },
   cardTitle: {
     fontSize: 18,
@@ -581,19 +631,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
+    fontWeight: '600',
   },
   gpsCard: {
     padding: SPACING.md,
     marginBottom: SPACING.md,
+    backgroundColor: COLORS.surface,
   },
   gpsTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: COLORS.text,
-    borderBottomWidth: 1,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    borderBottomWidth: 1.5,
     borderBottomColor: COLORS.border,
-    paddingBottom: SPACING.xs,
-    marginBottom: SPACING.sm,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   gpsLoading: {
     flexDirection: 'row',
@@ -604,6 +658,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 13,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   coordsGrid: {
     paddingVertical: SPACING.xs,
@@ -611,28 +666,35 @@ const styles = StyleSheet.create({
   coordsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   coordsRowCol: {
     flexDirection: 'column',
-    paddingVertical: 6,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   coordsLabel: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontSize: 12,
+    color: COLORS.textLight,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   coordsValue: {
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.text,
+    marginTop: 2,
   },
   addressValue: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
     lineHeight: 18,
-    marginTop: 2,
+    marginTop: 4,
   },
   geofenceStatusContainer: {
     marginTop: SPACING.md,
@@ -640,14 +702,14 @@ const styles = StyleSheet.create({
   geofenceBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.sm,
-    borderRadius: 8,
-    borderWidth: 1,
+    padding: SPACING.md,
+    borderRadius: 12,
+    borderWidth: 1.5,
   },
   geofenceText: {
     fontSize: 12,
     fontWeight: '700',
-    marginLeft: 6,
+    marginLeft: 8,
     lineHeight: 16,
     flex: 1,
   },
@@ -661,18 +723,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.danger,
     flex: 1,
+    fontWeight: '600',
   },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    marginTop: SPACING.md,
-    padding: SPACING.xs,
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary + '30',
+    borderRadius: 20,
+    backgroundColor: COLORS.primary + '05',
   },
   refreshText: {
-    marginLeft: 4,
+    marginLeft: 6,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.primary,
   },
   actionContainer: {
@@ -681,5 +749,6 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     height: 52,
+    borderRadius: 12,
   },
 });

@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   TouchableOpacityProps,
 } from 'react-native';
-import { COLORS, SPACING } from '../constants/theme';
+import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -68,7 +68,7 @@ export const Button: React.FC<ButtonProps> = ({
 const styles = StyleSheet.create({
   button: {
     height: 48,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
@@ -77,9 +77,11 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     backgroundColor: COLORS.primary,
+    ...SHADOWS.sm,
   },
   btnSecondary: {
     backgroundColor: COLORS.secondary,
+    ...SHADOWS.sm,
   },
   btnDanger: {
     backgroundColor: COLORS.danger,
@@ -93,8 +95,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   text: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   textPrimary: {
     color: COLORS.surface,

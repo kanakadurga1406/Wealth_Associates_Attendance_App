@@ -36,7 +36,32 @@ export const EmployeesListScreen: React.FC = () => {
   const adminUser = useSelector((state: RootState) => state.auth.user);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
   const { showAlert } = useCustomAlert();
+
+  // Refs for tracking latest states in onEndReached callback to avoid stale closures
+  const loadingRef = React.useRef(loading);
+  const loadingMoreRef = React.useRef(loadingMore);
+  const hasMoreRef = React.useRef(hasMore);
+  const lastDocRef = React.useRef(lastDoc);
+
+  React.useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
+  React.useEffect(() => {
+    loadingMoreRef.current = loadingMore;
+  }, [loadingMore]);
+
+  React.useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  React.useEffect(() => {
+    lastDocRef.current = lastDoc;
+  }, [lastDoc]);
 
   // Edit Employee States
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -196,73 +221,103 @@ export const EmployeesListScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (!adminUser) return;
+  const hydrateEmployees = async (docs: any[]) => {
+    return Promise.all(
+      docs.map(async (doc) => {
+        const userData = doc.data();
+        const employeeId = doc.id;
 
-    let query = firestore().collection('users').where('role', '==', 'EMPLOYEE');
-    if (adminUser.role !== 'SUPER_ADMIN') {
-      query = query.where('adminId', '==', adminUser.uid);
-    }
+        // Fetch employee data and admin data in parallel
+        const [empDoc, adminDoc] = await Promise.all([
+          firestore().collection('employees').doc(employeeId).get(),
+          userData.adminId
+            ? firestore().collection('users').doc(userData.adminId).get()
+            : Promise.resolve(null)
+        ]);
 
-    const unsubscribe = query.onSnapshot(
-      async (usersSnapshot) => {
-        setLoading(true);
-        if (!usersSnapshot) {
-          console.log('EmployeesListScreen: received null usersSnapshot');
-          return;
+        const empData = empDoc && empDoc.exists() ? empDoc.data() || {} : {};
+        let adminName = '';
+        
+        if (adminDoc && adminDoc.exists()) {
+          adminName = adminDoc.data()?.name || 'Unnamed Admin';
+        } else if (empData.adminId) {
+          // Fallback if adminId is only present in employee sub-profile
+          const fallbackAdminDoc = await firestore().collection('users').doc(empData.adminId).get();
+          adminName = fallbackAdminDoc.exists() ? fallbackAdminDoc.data()?.name || 'Unnamed Admin' : '';
         }
 
-        console.log('--- EMPLOYEES DIRECTORY FETCH ---');
-        console.log('Logged-in Admin UID:', adminUser.uid);
-        console.log('Number of raw employees matched in query:', usersSnapshot.size);
-
-        // Hydrate with employee collection (department, phone) and admin manager name in parallel
-        const hydratedList = await Promise.all(
-          usersSnapshot.docs.map(async (doc) => {
-            const userData = doc.data();
-            const employeeId = doc.id;
-
-            // Fetch employee data and admin data in parallel
-            const [empDoc, adminDoc] = await Promise.all([
-              firestore().collection('employees').doc(employeeId).get(),
-              userData.adminId
-                ? firestore().collection('users').doc(userData.adminId).get()
-                : Promise.resolve(null)
-            ]);
-
-            const empData = empDoc && empDoc.exists() ? empDoc.data() || {} : {};
-            let adminName = '';
-            
-            if (adminDoc && adminDoc.exists()) {
-              adminName = adminDoc.data()?.name || 'Unnamed Admin';
-            } else if (empData.adminId) {
-              // Fallback if adminId is only present in employee sub-profile
-              const fallbackAdminDoc = await firestore().collection('users').doc(empData.adminId).get();
-              adminName = fallbackAdminDoc.exists() ? fallbackAdminDoc.data()?.name || 'Unnamed Admin' : '';
-            }
-
-            return {
-              uid: employeeId,
-              ...userData,
-              ...empData,
-              adminName,
-            };
-          })
-        );
-
-        console.log('Hydrated List Size:', hydratedList.length);
-        console.log('---------------------------------');
-
-        setEmployees(hydratedList);
-        setLoading(false);
-      },
-      (error) => {
-        console.warn('Employees fetch error:', error);
-        setLoading(false);
-      }
+        return {
+          uid: employeeId,
+          ...userData,
+          ...empData,
+          adminName,
+        };
+      })
     );
+  };
 
-    return () => unsubscribe();
+  const fetchEmployees = async (isRefresh = false, currentLastDoc: any = null) => {
+    if (!adminUser) return;
+
+    try {
+      if (isRefresh) {
+        setLoading(true);
+        loadingRef.current = true;
+      } else {
+        setLoadingMore(true);
+        loadingMoreRef.current = true;
+      }
+
+      let query = firestore()
+        .collection('users')
+        .where('role', '==', 'EMPLOYEE');
+
+      if (adminUser.role !== 'SUPER_ADMIN') {
+        query = query.where('adminId', '==', adminUser.uid);
+      }
+
+      if (!isRefresh && currentLastDoc) {
+        query = query.startAfter(currentLastDoc);
+      }
+
+      query = query.limit(5);
+
+      const snapshot = await query.get();
+
+      if (snapshot.empty) {
+        if (isRefresh) {
+          setEmployees([]);
+        }
+        setHasMore(false);
+        hasMoreRef.current = false;
+        setLastDoc(null);
+        lastDocRef.current = null;
+      } else {
+        const hydrated = await hydrateEmployees(snapshot.docs);
+        if (isRefresh) {
+          setEmployees(hydrated);
+        } else {
+          setEmployees((prev) => [...prev, ...hydrated]);
+        }
+        const last = snapshot.docs[snapshot.docs.length - 1];
+        setLastDoc(last);
+        lastDocRef.current = last;
+        const more = snapshot.docs.length === 5;
+        setHasMore(more);
+        hasMoreRef.current = more;
+      }
+    } catch (err) {
+      console.warn('Error fetching employees:', err);
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
+      setLoadingMore(false);
+      loadingMoreRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees(true);
   }, [adminUser]);
 
   const handleDeleteEmployee = (uid: string, name: string) => {
@@ -285,6 +340,9 @@ export const EmployeesListScreen: React.FC = () => {
               // Note: Auth account deletion requires admin API. Since user is removed from database,
               // they will be blocked from logging in (LoginScreen checks for user doc existence).
 
+              // Update local state directly
+              setEmployees((prev) => prev.filter((e) => e.uid !== uid));
+              setLoading(false);
               showAlert('Success', `Employee ${name} removed.`);
             } catch (err: any) {
               console.warn('Employee delete error:', err);
@@ -387,6 +445,28 @@ export const EmployeesListScreen: React.FC = () => {
         timestamp: firestore.FieldValue.serverTimestamp(),
       });
 
+      // Update local state directly
+      setEmployees((prev) =>
+        prev.map((e) => {
+          if (e.uid === uid) {
+            return {
+              ...e,
+              name: editName.trim(),
+              email: editEmail.trim().toLowerCase(),
+              department: editDepartment.trim(),
+              phone: editPhone.trim(),
+              salary: parseFloat(editSalary) || 0,
+              allowedLeaves: parseInt(editAllowedLeaves) || 0,
+              workTimings: editWorkTimings.trim(),
+              weekOff: editWeekOffs.join(', '),
+              adminId,
+              adminName: editSelectedAdmin ? editSelectedAdmin.name : e.adminName,
+            };
+          }
+          return e;
+        })
+      );
+
       showAlert('Success', `Employee details updated successfully.`);
       setEditModalVisible(false);
     } catch (err: any) {
@@ -459,6 +539,22 @@ export const EmployeesListScreen: React.FC = () => {
           renderItem={renderItem}
           keyExtractor={(item) => item.uid}
           contentContainerStyle={styles.listContainer}
+          onEndReached={() => {
+            if (!loadingRef.current && !loadingMoreRef.current && hasMoreRef.current && lastDocRef.current) {
+              fetchEmployees(false, lastDocRef.current);
+            }
+          }}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={() => {
+            if (loadingMore) {
+              return (
+                <View style={{ paddingVertical: SPACING.md, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              );
+            }
+            return null;
+          }}
           ListEmptyComponent={
             <Text style={styles.emptyText}>No employees registered yet.</Text>
           }
