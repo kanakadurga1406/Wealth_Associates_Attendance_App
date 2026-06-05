@@ -37,7 +37,6 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
     legacyPaidLeaveDays: 0,
   });
   const [employeeProfile, setEmployeeProfile] = useState<any>(null);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
@@ -120,6 +119,10 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
           late: lateCount,
           absent: absentCount,
         }));
+        setLoading(false);
+      }, (err) => {
+        console.warn('Month attendance subscription error:', err);
+        setLoading(false);
       });
 
     // 3. Subscribe to leave requests for stats
@@ -187,26 +190,8 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
           explicitPaidLeaveDays: explicitPaidDaysThisMonth,
           legacyPaidLeaveDays: legacyPaidDaysThisMonth,
         }));
-      });
-
-    // 4. Subscribe to recent activity logs
-    const unsubscribeLogs = firestore()
-      .collection('activity_logs')
-      .where('employeeId', '==', user.uid)
-      .orderBy('timestamp', 'desc')
-      .limit(5)
-      .onSnapshot((snapshot) => {
-        if (!snapshot) return;
-
-        const logs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setRecentLogs(logs);
-        setLoading(false);
       }, (err) => {
-        console.warn('Logs subscription error:', err);
-        setLoading(false);
+        console.warn('Leaves subscription error:', err);
       });
 
     // 5. Subscribe to unread notifications
@@ -244,7 +229,6 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
       unsubscribeToday();
       unsubscribeMonth();
       unsubscribeLeaves();
-      unsubscribeLogs();
       unsubscribeNotifications();
       unsubscribePayment();
     };
@@ -558,23 +542,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
           </TouchableOpacity>
         </View>
 
-        {/* Activity Stream */}
-        <Text style={styles.sectionTitle}>Your Activity Feed</Text>
-        <Card style={styles.logsCard}>
-          {recentLogs.length === 0 ? (
-            <Text style={styles.emptyLogs}>No actions logged today.</Text>
-          ) : (
-            recentLogs.map((log) => (
-              <View key={log.id} style={styles.logRow}>
-                <Icon name="footsteps-outline" size={14} color={COLORS.textSecondary} style={styles.logIcon} />
-                <View style={styles.logContent}>
-                  <Text style={styles.logText}>{log.activity}</Text>
-                  <Text style={styles.logTime}>{formatTime(log.timestamp)}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </Card>
+
       </ScrollView>
     </View>
   );
@@ -755,43 +723,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
   },
-  logsCard: {
-    padding: SPACING.md,
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.surface,
-  },
-  logRow: {
-    flexDirection: 'row',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  logIcon: {
-    marginTop: 4,
-    marginRight: 10,
-  },
-  logContent: {
-    flex: 1,
-  },
-  logText: {
-    fontSize: 13,
-    color: COLORS.text,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  logTime: {
-    fontSize: 10,
-    color: COLORS.textLight,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  emptyLogs: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    paddingVertical: SPACING.md,
-    fontWeight: '600',
-  },
+
   salaryCard: {
     padding: SPACING.md,
     marginBottom: SPACING.md,
