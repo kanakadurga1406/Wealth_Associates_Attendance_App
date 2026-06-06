@@ -8,13 +8,15 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import firestore from '@react-native-firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import database from '@react-native-firebase/database';
 import { RootState } from '../redux/store';
 import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
+import { BottomTabBar } from '../components/BottomTabBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatTime, formatDate } from '../utils/helpers';
 import { useRealTimeStatus } from '../hooks/useRealTimeStatus';
@@ -35,6 +37,7 @@ interface EmployeePresence {
 }
 
 export const RealTimeStatusScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const adminUser = useSelector((state: RootState) => state.auth.user);
   
   const [employees, setEmployees] = useState<EmployeePresence[]>([]);
@@ -119,16 +122,15 @@ export const RealTimeStatusScreen: React.FC = () => {
           return;
         }
 
-        // Fetch employee details (department info) in parallel
-        const empDetailsPromises = employeeIds.map(id =>
-          firestore().collection('employees').doc(id).get()
-        );
-        const empDetailsSnapshots = await Promise.all(empDetailsPromises);
+        // Fetch all employee details in ONE query instead of N parallel queries
+        let empDetailsQuery: FirebaseFirestoreTypes.Query = firestore().collection('employees');
+        if (adminUser.role !== 'SUPER_ADMIN') {
+          empDetailsQuery = empDetailsQuery.where('adminId', '==', adminUser.uid);
+        }
+        const empDetailsSnapshot = await empDetailsQuery.get();
         const detailsMap: { [key: string]: any } = {};
-        empDetailsSnapshots.forEach(docSnap => {
-          if (docSnap.exists()) {
-            detailsMap[docSnap.id] = docSnap.data();
-          }
+        empDetailsSnapshot.docs.forEach(docSnap => {
+          detailsMap[docSnap.id] = docSnap.data();
         });
 
         employeeDataMap = {};
@@ -352,6 +354,9 @@ export const RealTimeStatusScreen: React.FC = () => {
           }
         />
       )}
+      {adminUser && (
+        <BottomTabBar role={adminUser.role} activeTab="Live Status" navigation={navigation} />
+      )}
     </View>
   );
 };
@@ -400,6 +405,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: SPACING.md,
+    paddingBottom: 110,
   },
   employeeCard: {
     marginBottom: SPACING.md,

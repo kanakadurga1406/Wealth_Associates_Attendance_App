@@ -17,6 +17,7 @@ import {
 import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/store';
+import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Button } from '../components/Button';
@@ -25,6 +26,7 @@ import { Input } from '../components/Input';
 import { TimePickerModal } from '../components/TimePickerModal';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useCustomAlert } from '../context/CustomAlertContext';
+import { BottomTabBar } from '../components/BottomTabBar';
 
 interface AdminItem {
   uid: string;
@@ -33,6 +35,7 @@ interface AdminItem {
 }
 
 export const EmployeesListScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const adminUser = useSelector((state: RootState) => state.auth.user);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -935,6 +938,9 @@ export const EmployeesListScreen: React.FC = () => {
         onClose={() => setTimePickerVisible(false)}
         onConfirm={handleTimeConfirm}
       />
+      {adminUser && (
+        <BottomTabBar role={adminUser.role} activeTab="Directory" navigation={navigation} />
+      )}
     </View>
   );
 };
@@ -946,6 +952,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: SPACING.md,
+    paddingBottom: 110,
   },
   card: {
     marginBottom: SPACING.md,

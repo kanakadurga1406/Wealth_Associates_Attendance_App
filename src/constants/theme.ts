@@ -1,41 +1,41 @@
 export const COLORS = {
-  primary: '#2563EB', // Professional Royal Blue
-  primaryLight: '#60A5FA', // Light sky blue
-  primaryDark: '#1E40AF', // Deep navy
+  primary: '#5C46E8', // Active Purple / Violet
+  primaryLight: '#E0DBFF', // Soft lavender tint
+  primaryDark: '#352185', // Deep indigo purple
   
-  secondary: '#0F766E', // Teal Slate
-  secondaryLight: '#14B8A6', // Teal Light
+  secondary: '#4F46E5', // Indigo accent
+  secondaryLight: '#EEF2F6', 
   
-  background: '#F8FAFC', // Slate 50
+  background: '#F5F4FA', // Very light lavender/grey background
   surface: '#FFFFFF', // Pure White
   surfaceCard: '#FFFFFF',
   
-  text: '#0F172A', // Slate 900 (High contrast)
-  textSecondary: '#475569', // Slate 600 (Subtitles, body)
-  textLight: '#64748B', // Slate 500 (Muted labels)
+  text: '#1D1737', // Dark purple-slate text
+  textSecondary: '#655F80', // Secondary slate text
+  textLight: '#8E88A8', // Muted text
   
-  border: '#E2E8F0', // Slate 200 (Clean divider/borders)
+  border: '#EBE7F2', // Soft lavender border
   
-  success: '#0D9488', // Emerald Teal
-  successLight: '#CCFBF1', // 100
+  success: '#10B981', // Premium Emerald Green
+  successLight: '#D1FAE5',
   
-  danger: '#E11D48', // Rose Red
-  dangerLight: '#FFE4E6', // 100
+  danger: '#EF4444', // Rose Red
+  dangerLight: '#FEE2E2',
   
-  warning: '#D97706', // Amber Yellow
-  warningLight: '#FEF3C7', // 100
+  warning: '#F59E0B', // Amber
+  warningLight: '#FEF3C7',
   
-  info: '#2563EB', // Blue
-  infoLight: '#EFF6FF', // 100
+  info: '#3B82F6', // Blue
+  infoLight: '#DBEAFE',
 
-  // Dark Mode colors
+  // Dark Mode colors (aligned with deep dark purple/slate)
   dark: {
-    background: '#0F172A', // Slate 900
-    surface: '#1E293B', // Slate 800
-    surfaceCard: '#1E293B',
-    text: '#F8FAFC', // Slate 50
-    textSecondary: '#94A3B8', // Slate 400
-    border: '#334155', // Slate 700
+    background: '#120E2B', 
+    surface: '#1D183E', 
+    surfaceCard: '#1D183E',
+    text: '#F5F4FA', 
+    textSecondary: '#A29DBE', 
+    border: '#2E2757', 
   }
 };
 

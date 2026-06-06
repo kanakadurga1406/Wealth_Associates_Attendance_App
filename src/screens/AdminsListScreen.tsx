@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, FlatList, ActivityIndicator } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { useCustomAlert } from '../context/CustomAlertContext';
+import { BottomTabBar } from '../components/BottomTabBar';
 
 export const AdminsListScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [admins, setAdmins] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { showAlert } = useCustomAlert();
@@ -170,6 +173,7 @@ export const AdminsListScreen: React.FC = () => {
           }
         />
       )}
+      <BottomTabBar role="SUPER_ADMIN" activeTab="Admins" navigation={navigation} />
     </View>
   );
 };
@@ -181,6 +185,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: SPACING.md,
+    paddingBottom: 110,
   },
   card: {
     marginBottom: SPACING.md,

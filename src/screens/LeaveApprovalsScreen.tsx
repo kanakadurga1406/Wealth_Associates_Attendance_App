@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
 import { RootState } from '../redux/store';
 import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { BottomTabBar } from '../components/BottomTabBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatDate } from '../utils/helpers';
 import { useRealTimeStatus } from '../hooks/useRealTimeStatus';
@@ -271,6 +273,7 @@ const LeaveRequestCard: React.FC<LeaveRequestCardProps> = ({ item, onApprove, on
 };
 
 export const LeaveApprovalsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const adminUser = useSelector((state: RootState) => state.auth.user);
   
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -472,6 +475,9 @@ export const LeaveApprovalsScreen: React.FC = () => {
           }
         />
       )}
+      {adminUser && (
+        <BottomTabBar role={adminUser.role} activeTab="Approvals" navigation={navigation} />
+      )}
     </View>
   );
 };
@@ -493,6 +499,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: SPACING.md,
+    paddingBottom: 110,
   },
   requestCard: {
     marginBottom: SPACING.md,

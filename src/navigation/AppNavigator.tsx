@@ -26,6 +26,8 @@ import { EmployeeDashboard } from '../screens/EmployeeDashboard';
 import { AttendanceScreen } from '../screens/AttendanceScreen';
 import { LeaveRequestScreen } from '../screens/LeaveRequestScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { HistoryScreen } from '../screens/HistoryScreen';
+import { MyApplicationsScreen } from '../screens/MyApplicationsScreen';
 
 const Stack = createStackNavigator();
 
@@ -33,7 +35,7 @@ export const AppNavigator: React.FC = () => {
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
       {!isAuthenticated ? (
         // Unauthenticated Stack
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -70,6 +72,8 @@ export const AppNavigator: React.FC = () => {
           <Stack.Screen name="Attendance" component={AttendanceScreen} />
           <Stack.Screen name="LeaveRequest" component={LeaveRequestScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="History" component={HistoryScreen} />
+          <Stack.Screen name="MyApplications" component={MyApplicationsScreen} />
         </>
       )}
     </Stack.Navigator>

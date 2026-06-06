@@ -16,6 +16,12 @@ import { COLORS } from './src/constants/theme';
 import { CustomAlertProvider, useCustomAlert } from './src/context/CustomAlertContext';
 import { SplashScreen } from './src/components/SplashScreen';
 
+// Enable Firestore offline caching persistence
+firestore().settings({
+  persistence: true,
+  cacheSizeBytes: firestore.CACHE_SIZE_UNLIMITED,
+});
+
 const RootAppContent: React.FC = () => {
   const dispatch = useDispatch();
   const { loading } = useSelector((state: RootState) => state.auth);

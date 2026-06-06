@@ -12,14 +12,17 @@ import {
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import { RootState } from '../redux/store';
 import { COLORS, SPACING } from '../constants/theme';
 import { Header } from '../components/Header';
 import { Card } from '../components/Card';
+import { BottomTabBar } from '../components/BottomTabBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useCustomAlert } from '../context/CustomAlertContext';
 
 export const PayrollScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const adminUser = useSelector((state: RootState) => state.auth.user);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -477,6 +480,9 @@ export const PayrollScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      {adminUser && (
+        <BottomTabBar role={adminUser.role} activeTab="Payroll" navigation={navigation} />
+      )}
     </View>
   );
 };
@@ -509,7 +515,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 110,
   },
   card: {
     marginBottom: SPACING.md,

@@ -254,20 +254,6 @@ export const Header: React.FC<HeaderProps> = ({
             {subtitle && <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>}
           </View>
         </View>
-
-        {/* Right Side: Profile Icon + Role Label below it */}
-        {user && (
-          <TouchableOpacity 
-            style={styles.profileSection} 
-            onPress={handleProfilePress}
-            activeOpacity={0.7}
-          >
-            <Icon name={getRoleIcon()} size={26} color={COLORS.primary} />
-            <Text style={styles.profileRoleText}>
-              {user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : 'Employee'}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Profile Details & Settings Modal */}
