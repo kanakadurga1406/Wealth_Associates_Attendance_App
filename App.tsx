@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Text, Platform, PermissionsAndroid } from 'react-native';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import DeviceInfo from 'react-native-device-info';
 import messaging from '@react-native-firebase/messaging';
+import notifee, { AndroidImportance } from 'react-native-notify-kit';
 
 import { store, RootState } from './src/redux/store';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -24,7 +25,7 @@ firestore().settings({
 
 const RootAppContent: React.FC = () => {
   const dispatch = useDispatch();
-  const { loading } = useSelector((state: RootState) => state.auth);
+  const { loading, user } = useSelector((state: RootState) => state.auth);
   const { showAlert } = useCustomAlert();
 
   const requestUserPermission = async () => {
@@ -34,12 +35,15 @@ const RootAppContent: React.FC = () => {
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
+      // Request Notifee permission (handles Android 13+ runtime permission and iOS)
+      await notifee.requestPermission();
+
       if (enabled) {
         console.log('Authorization status:', authStatus);
         return true;
       }
     } catch (e) {
-      console.warn('FCM Permission Request error:', e);
+      console.warn('FCM/Notifee Permission Request error:', e);
     }
     return false;
   };
@@ -61,12 +65,63 @@ const RootAppContent: React.FC = () => {
     }
   };
 
+  // Initialize notifications on component mount
+  useEffect(() => {
+    const initNotifications = async () => {
+      try {
+        // Create the high importance channel
+        await notifee.createChannel({
+          id: 'high_importance_channel_v3',
+          name: 'High Importance Notifications',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+        });
+
+        // Request runtime permission for Android 13+
+        if (Platform.OS === 'android' && Platform.Version >= 33) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+          );
+          console.log('Android POST_NOTIFICATIONS runtime permission:', granted);
+        }
+
+        // Request permission via Notifee and Firebase Messaging
+        await notifee.requestPermission();
+        await messaging().requestPermission();
+      } catch (e) {
+        console.warn('Failed to initialize notifications:', e);
+      }
+    };
+
+    initNotifications();
+  }, []);
+
   useEffect(() => {
     const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
       console.log('A new FCM message arrived in foreground!', remoteMessage);
       const title = remoteMessage.notification?.title || 'Notification';
       const body = remoteMessage.notification?.body || '';
+      
+      // 1. Keep the in-app alert dialog as is
       showAlert(title, body);
+
+      // 2. Display a heads-up system notification banner with default sound
+      try {
+        await notifee.displayNotification({
+          title: title,
+          body: body,
+          android: {
+            channelId: 'high_importance_channel_v3',
+            importance: AndroidImportance.HIGH,
+            sound: 'default',
+            pressAction: {
+              id: 'default',
+            },
+          },
+        });
+      } catch (err) {
+        console.warn('Failed to display foreground local notification:', err);
+      }
     });
 
     return () => {
@@ -261,6 +316,59 @@ const RootAppContent: React.FC = () => {
       if (unsubscribeFirestore) unsubscribeFirestore();
     };
   }, [dispatch]);
+
+  // Global Firestore real-time notifications listener
+  // This triggers a local heads-up notification and in-app alert when a new notification doc is added,
+  // resolving Spark-plan Cloud Functions limitations by doing local foreground delivery.
+  useEffect(() => {
+    if (!user) return;
+
+    let isInitialLoad = true;
+    const unsubscribe = firestore()
+      .collection('notifications')
+      .where('employeeId', '==', user.uid)
+      .where('status', '==', 'unread')
+      .onSnapshot((snapshot) => {
+        if (!snapshot) return;
+
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            if (!isInitialLoad) {
+              const data = change.doc.data();
+              const title = data.title || 'Notification';
+              const body = data.body || '';
+
+              // 1. Show custom in-app alert dialog as is
+              showAlert(title, body);
+
+              // 2. Display a heads-up system notification banner with default sound
+              try {
+                await notifee.displayNotification({
+                  title,
+                  body,
+                  android: {
+                    channelId: 'high_importance_channel_v3',
+                    importance: AndroidImportance.HIGH,
+                    sound: 'default',
+                    pressAction: {
+                      id: 'default',
+                    },
+                  },
+                });
+              } catch (err) {
+                console.warn('Failed to display listener notification:', err);
+              }
+            }
+          }
+        });
+
+        isInitialLoad = false;
+      }, (err) => {
+        console.warn('Global Firestore notifications listener error:', err);
+      });
+
+    return () => unsubscribe();
+  }, [user, showAlert]);
 
   if (loading) {
     return <SplashScreen />;

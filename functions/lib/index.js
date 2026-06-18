@@ -394,6 +394,7 @@ exports.onNotificationCreated = functions.firestore
             android: {
                 priority: "high",
                 notification: {
+                    channelId: "high_importance_channel_v3",
                     sound: "default",
                     defaultSound: true,
                 },
