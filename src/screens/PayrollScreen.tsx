@@ -185,7 +185,9 @@ export const PayrollScreen: React.FC = () => {
                 if (aData.status === 'Present') presentCount++;
                 if (aData.status === 'Late') {
                   presentCount++;
-                  lateCount++;
+                  if (aData.lateStatus !== 'Approved') {
+                    lateCount++;
+                  }
                 }
                 if (aData.status === 'Absent') absentCount++;
               }

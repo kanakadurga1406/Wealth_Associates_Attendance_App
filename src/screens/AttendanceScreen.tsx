@@ -32,6 +32,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   const [officeLoc, setOfficeLoc] = useState<{ latitude: number; longitude: number; radius: number } | null>(null);
   const [adminId, setAdminId] = useState<string | null>(null);
+  const [employeeSalary, setEmployeeSalary] = useState<number>(0);
   const [loadingOffice, setLoadingOffice] = useState(true);
   const [address, setAddress] = useState<string>('Resolving address...');
   const [loadingAddress, setLoadingAddress] = useState(false);
@@ -105,7 +106,9 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         const empSnap = await firestore().collection('employees').doc(user.uid).get();
         if (empSnap.exists()) {
           const aId = empSnap.data()?.adminId;
+          const salary = empSnap.data()?.salary || 0;
           setAdminId(aId || null);
+          setEmployeeSalary(salary);
           if (aId) {
             const officeSnap = await firestore()
               .collection('office_locations')
@@ -186,7 +189,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   const isWithinGeofence = distance !== null && officeLoc !== null && distance <= officeLoc.radius;
 
-  const isButtonDisabled = !currentCoords || loadingLocation || loadingOffice || distance === null || officeLoc === null || !isWithinGeofence;
+  const isButtonDisabled = !currentCoords || loadingLocation || loadingOffice || distance === null || officeLoc === null;
 
   // Out-of-range alert warning for check-in (only alerts once)
   useEffect(() => {
@@ -377,17 +380,20 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
         const newAttendance = {
           employeeId: uid,
+          employeeName: user?.name || 'Employee',
+          adminId: user?.adminId || '',
           checkIn: firestore.FieldValue.serverTimestamp(),
           checkOut: null,
           latitude: currentCoords.latitude,
           longitude: currentCoords.longitude,
           status,
+          lateStatus: status === 'Late' ? 'Pending' : null,
           workingHours: 0,
           date: dateString,
           checkInAddress: address,
         };
 
-        await firestore().collection('attendance').add(newAttendance);
+        const docRef = await firestore().collection('attendance').add(newAttendance);
 
         // Log success
         await firestore().collection('activity_logs').add({
@@ -407,12 +413,20 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
         // Notify Admin of Check-in
         if (adminId) {
+          const estDeduction = employeeSalary ? (employeeSalary / 60) : 0;
           await firestore().collection('notifications').add({
             employeeId: adminId,
-            title: 'Employee Checked In',
-            body: `${user?.name || 'Employee'} has checked in today with status: ${status}.`,
+            title: status === 'Late' ? 'Late Login Request' : 'Employee Checked In',
+            body: status === 'Late'
+              ? `${user?.name || 'Employee'} logged in late today. Estimated Deduction: ₹${estDeduction.toFixed(2)}. Approval required.`
+              : `${user?.name || 'Employee'} has checked in today with status: ${status}.`,
             status: 'unread',
             createdAt: firestore.FieldValue.serverTimestamp(),
+            type: status === 'Late' ? 'late_pardon_request' : 'check_in',
+            attendanceId: status === 'Late' ? docRef.id : null,
+            senderName: user?.name || 'Employee',
+            senderId: uid,
+            estimatedDeduction: status === 'Late' ? estDeduction : 0,
           });
         }
 
@@ -539,7 +553,7 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                 <Text style={styles.coordsValue}>±{Math.round(currentCoords.accuracy)} meters</Text>
               </View>
 
-              {distance !== null && officeLoc !== null && (
+              {distance !== null && officeLoc !== null ? (
                 <View style={styles.geofenceStatusContainer}>
                   <View style={[
                     styles.geofenceBanner, 
@@ -560,7 +574,26 @@ export const AttendanceScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : officeLoc === null && !loadingOffice ? (
+                <View style={styles.geofenceStatusContainer}>
+                  <View style={[
+                    styles.geofenceBanner, 
+                    { 
+                      backgroundColor: COLORS.danger + '1A',
+                      borderColor: COLORS.danger + '30' 
+                    }
+                  ]}>
+                    <Icon 
+                      name="close-circle-outline" 
+                      size={18} 
+                      color={COLORS.danger} 
+                    />
+                    <Text style={[styles.geofenceText, { color: COLORS.danger }]}>
+                      Office location not configured by Admin.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
           ) : (
             <View style={styles.gpsError}>

@@ -20,46 +20,7 @@ export const useRealTimeStatus = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
 
-    const statusRef = database().ref(`/status/users/${user.uid}`);
-    const connectedRef = database().ref('.info/connected');
-
-    const handleConnectionChange = (snapshot: any) => {
-      const isConnected = snapshot.val();
-      if (isConnected) {
-        // Setup onDisconnect hook to mark offline without erasing details
-        statusRef.onDisconnect().update({
-          state: 'offline',
-          lastSeen: database.ServerValue.TIMESTAMP,
-        }).then(() => {
-          // Mark online initially
-          statusRef.update({
-            state: 'online',
-            lastSeen: database.ServerValue.TIMESTAMP,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            currentActivity: 'dashboard',
-          });
-        });
-      }
-    };
-
-    // Listen to connection state
-    const listener = connectedRef.on('value', handleConnectionChange);
-
-    // Return cleanup
-    return () => {
-      connectedRef.off('value', listener);
-      // Mark offline on unmount/logout
-      statusRef.update({
-        state: 'offline',
-        lastSeen: database.ServerValue.TIMESTAMP,
-      });
-    };
-  }, [user]);
 
   return { updateActivity };
 };

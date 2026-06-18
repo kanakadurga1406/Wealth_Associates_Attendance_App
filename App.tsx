@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import database from '@react-native-firebase/database';
 import DeviceInfo from 'react-native-device-info';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance } from 'react-native-notify-kit';
@@ -27,6 +28,46 @@ const RootAppContent: React.FC = () => {
   const dispatch = useDispatch();
   const { loading, user } = useSelector((state: RootState) => state.auth);
   const { showAlert } = useCustomAlert();
+
+  // Global Realtime Database Presence Tracker
+  useEffect(() => {
+    if (!user) return;
+
+    const statusRef = database().ref(`/status/users/${user.uid}`);
+    const connectedRef = database().ref('.info/connected');
+
+    const handleConnectionChange = (snapshot: any) => {
+      const isConnected = snapshot.val();
+      if (isConnected) {
+        // Setup onDisconnect hook to mark offline without erasing details
+        statusRef.onDisconnect().update({
+          state: 'offline',
+          lastSeen: database.ServerValue.TIMESTAMP,
+        }).then(() => {
+          // Mark online initially
+          statusRef.update({
+            state: 'online',
+            lastSeen: database.ServerValue.TIMESTAMP,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            currentActivity: 'dashboard',
+          });
+        });
+      }
+    };
+
+    const listener = connectedRef.on('value', handleConnectionChange);
+
+    return () => {
+      connectedRef.off('value', listener);
+      // Mark offline on unmount or logout
+      statusRef.update({
+        state: 'offline',
+        lastSeen: database.ServerValue.TIMESTAMP,
+      });
+    };
+  }, [user]);
 
   const requestUserPermission = async () => {
     try {

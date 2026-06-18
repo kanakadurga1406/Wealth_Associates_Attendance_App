@@ -23,18 +23,25 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const getButtonStyles = () => {
-    switch (variant) {
-      case 'secondary':
-        return [styles.button, styles.btnSecondary, style];
-      case 'danger':
-        return [styles.button, styles.btnDanger, style];
-      case 'warning':
-        return [styles.button, styles.btnWarning, style];
-      case 'outline':
-        return [styles.button, styles.btnOutline, style];
-      default:
-        return [styles.button, styles.btnPrimary, style];
+    const baseStyles = (() => {
+      switch (variant) {
+        case 'secondary':
+          return [styles.button, styles.btnSecondary, style];
+        case 'danger':
+          return [styles.button, styles.btnDanger, style];
+        case 'warning':
+          return [styles.button, styles.btnWarning, style];
+        case 'outline':
+          return [styles.button, styles.btnOutline, style];
+        default:
+          return [styles.button, styles.btnPrimary, style];
+      }
+    })();
+
+    if (disabled) {
+      return [...baseStyles, styles.btnDisabled];
     }
+    return baseStyles;
   };
 
   const getTextStyles = () => {
@@ -93,6 +100,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: COLORS.primary,
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
   text: {
     fontSize: 14,

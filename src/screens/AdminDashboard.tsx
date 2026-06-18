@@ -29,7 +29,7 @@ import { BottomTabBar } from '../components/BottomTabBar';
 
 export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) => {
   const adminUser = useSelector((state: RootState) => state.auth.user);
-  const [stats, setStats] = useState({ present: 0, late: 0, absent: 0, totalEmployees: 0, pendingLeaves: 0, pendingDevices: 0 });
+  const [stats, setStats] = useState({ present: 0, late: 0, absent: 0, totalEmployees: 0, pendingLeaves: 0, pendingDevices: 0, pendingLates: 0 });
   const [notifications, setNotifications] = useState<any[]>([]);
 
   // Ticking clock state
@@ -139,10 +139,24 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
             setStats(prev => ({ ...prev, pendingDevices: deviceSnapshot.size }));
           });
 
+        // 5. Fetch pending late login requests
+        const unsubscribeLates = firestore()
+          .collection('attendance')
+          .where('status', '==', 'Late')
+          .where('lateStatus', '==', 'Pending')
+          .where('adminId', '==', adminUser.uid)
+          .onSnapshot((lateSnapshot) => {
+            if (!lateSnapshot) return;
+            setStats(prev => ({ ...prev, pendingLates: lateSnapshot.size }));
+          }, (err) => {
+            console.warn('Error fetching late approvals count:', err);
+          });
+
         return () => {
           unsubscribeAttendance();
           unsubscribeLeaves();
           unsubscribeDevices();
+          unsubscribeLates();
         };
       });
 
@@ -278,6 +292,94 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
       });
     } catch (err) {
       console.warn('Error dismissing notification:', err);
+    }
+  };
+
+  const handleNotifLateAction = async (notif: any, action: 'approve' | 'reject') => {
+    if (!notif.attendanceId) {
+      showAlert('Error', 'Invalid check-in request data.');
+      return;
+    }
+
+    try {
+      const attDoc = await firestore().collection('attendance').doc(notif.attendanceId).get();
+      if (!attDoc.exists) {
+        showAlert('Error', 'Attendance record not found.');
+        return;
+      }
+
+      const attData = attDoc.data();
+      if (!attData) return;
+
+      if (attData.lateStatus !== 'Pending') {
+        showAlert('Info', `This request has already been ${attData.lateStatus.toLowerCase()}.`);
+        await firestore().collection('notifications').doc(notif.id).update({ status: 'read' });
+        return;
+      }
+
+      const employeeId = attData.employeeId;
+      const employeeName = attData.employeeName || notif.senderName || 'Employee';
+      const dateString = attData.date || 'today';
+
+      const batch = firestore().batch();
+      const attRef = firestore().collection('attendance').doc(notif.attendanceId);
+      const currentNotifRef = firestore().collection('notifications').doc(notif.id);
+
+      if (action === 'approve') {
+        batch.update(attRef, {
+          lateStatus: 'Approved',
+          lateApprovedAt: firestore.FieldValue.serverTimestamp(),
+          lateApprovedBy: adminUser?.uid || 'system',
+        });
+
+        const newNotifRef = firestore().collection('notifications').doc();
+        batch.set(newNotifRef, {
+          employeeId: employeeId,
+          title: 'Late Login Pardoned',
+          body: `Your late login request on ${dateString} was approved. No salary deduction will be applied.`,
+          status: 'unread',
+          createdAt: firestore.FieldValue.serverTimestamp(),
+        });
+
+        const logRef = firestore().collection('activity_logs').doc();
+        batch.set(logRef, {
+          employeeId: adminUser?.uid || 'system',
+          activity: `Approved (Pardoned) late login for employee: ${employeeName} on ${dateString}`,
+          timestamp: firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        batch.update(attRef, {
+          lateStatus: 'Rejected',
+          lateRejectedAt: firestore.FieldValue.serverTimestamp(),
+          lateRejectedBy: adminUser?.uid || 'system',
+        });
+
+        const newNotifRef = firestore().collection('notifications').doc();
+        batch.set(newNotifRef, {
+          employeeId: employeeId,
+          title: 'Late Login Deduction Applied',
+          body: `Your late login request on ${dateString} was rejected by Admin. Salary deduction has been applied.`,
+          status: 'unread',
+          createdAt: firestore.FieldValue.serverTimestamp(),
+        });
+
+        const logRef = firestore().collection('activity_logs').doc();
+        batch.set(logRef, {
+          employeeId: adminUser?.uid || 'system',
+          activity: `Rejected late login pardon for employee: ${employeeName} on ${dateString}`,
+          timestamp: firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      batch.update(currentNotifRef, {
+        status: 'read',
+      });
+
+      await batch.commit();
+      showAlert('Success', `Late login request for ${employeeName} has been ${action === 'approve' ? 'approved' : 'rejected'}.`);
+    } catch (err: any) {
+      console.error('Error processing late login request from notification:', err);
+      showAlert('Error', err.message || 'Failed to process request.');
     }
   };
 
@@ -480,8 +582,22 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
               <Text style={styles.menuLabel}>Device Approvals</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('LateApprovals')}
+            >
+              <View style={[styles.menuIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.08)' }]}>
+                <Icon name="time-outline" size={22} color={COLORS.warning} />
+                {stats.pendingLates > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{stats.pendingLates}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.menuLabel}>Late Approvals</Text>
+            </TouchableOpacity>
+
             {/* Empty grid spacers */}
-            <View style={[styles.menuItem, { opacity: 0 }]} />
             <View style={[styles.menuItem, { opacity: 0 }]} />
           </View>
         </Card>
@@ -629,14 +745,32 @@ export const AdminDashboard: React.FC<{ navigation: any }> = ({ navigation }) =>
                 <Text style={styles.emptyNotificationsText}>No unread notifications.</Text>
               ) : (
                 notifications.map((notif) => (
-                  <View key={notif.id} style={styles.notifModalCard}>
-                    <View style={styles.notifTextCol}>
-                      <Text style={styles.notifTitle}>{notif.title}</Text>
-                      <Text style={styles.notifBody}>{notif.body}</Text>
+                  <View key={notif.id} style={[styles.notifModalCard, notif.type === 'late_pardon_request' && styles.notifModalCardColumn]}>
+                    <View style={styles.notifRowHeader}>
+                      <View style={styles.notifTextCol}>
+                        <Text style={styles.notifTitle}>{notif.title}</Text>
+                        <Text style={styles.notifBody}>{notif.body}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => dismissNotification(notif.id)} style={styles.notifDismissCircle}>
+                        <Icon name="checkmark" size={16} color={COLORS.success} />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => dismissNotification(notif.id)} style={styles.notifDismissCircle}>
-                      <Icon name="checkmark" size={16} color={COLORS.success} />
-                    </TouchableOpacity>
+                    {notif.type === 'late_pardon_request' && (
+                      <View style={styles.notifActionRow}>
+                        <TouchableOpacity 
+                          style={[styles.notifActionBtn, styles.notifRejectBtn]} 
+                          onPress={() => handleNotifLateAction(notif, 'reject')}
+                        >
+                          <Text style={styles.notifActionBtnTextReject}>Reject</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.notifActionBtn, styles.notifApproveBtn]} 
+                          onPress={() => handleNotifLateAction(notif, 'approve')}
+                        >
+                          <Text style={styles.notifActionBtnTextApprove}>Accept</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 ))
               )}
@@ -1090,6 +1224,48 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.successLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  notifModalCardColumn: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+  notifRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  notifActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    width: '100%',
+  },
+  notifActionBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginLeft: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifRejectBtn: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  notifApproveBtn: {
+    backgroundColor: COLORS.primary,
+  },
+  notifActionBtnTextReject: {
+    color: COLORS.danger,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  notifActionBtnTextApprove: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Bottom Tab Bar

@@ -37,6 +37,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
   const [stats, setStats] = useState({
     present: 0,
     late: 0,
+    lateForSalary: 0,
     absent: 0,
     pendingLeave: 0,
     approvedLeave: 0,
@@ -124,6 +125,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
         
         let presentCount = 0;
         let lateCount = 0;
+        let lateCountForSalary = 0;
         let absentCount = 0;
         const allRecords: AttendanceRecord[] = [];
 
@@ -138,6 +140,9 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
             if (data.status === 'Late') {
               presentCount++;
               lateCount++;
+              if (data.lateStatus !== 'Approved') {
+                lateCountForSalary++;
+              }
             }
             if (data.status === 'Absent') absentCount++;
           }
@@ -148,6 +153,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
           ...prev,
           present: presentCount,
           late: lateCount,
+          lateForSalary: lateCountForSalary,
           absent: absentCount,
         }));
         setLoading(false);
@@ -432,7 +438,7 @@ export const EmployeeDashboard: React.FC<{ navigation: any }> = ({ navigation })
 
     const allowed = parseInt(employeeProfile?.allowedLeaves) || 0;
     const taken = stats.approvedLeaveDays || 0;
-    const lateCount = stats.late || 0;
+    const lateCount = stats.lateForSalary || 0;
     const absentCount = stats.absent || 0;
 
     const dailyWage = salary / 30;

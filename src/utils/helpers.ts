@@ -49,7 +49,7 @@ export function getStatusColor(status: string): string {
     case 'checked in':
       return '#10B981'; // emerald
     case 'late':
-      return '#F59E0B'; // amber
+      return '#EF4444'; // red
     case 'absent':
     case 'not checked in':
       return '#EF4444'; // red

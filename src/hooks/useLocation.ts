@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
@@ -17,21 +17,39 @@ export const useLocation = () => {
 
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
     try {
-      const permission = Platform.select({
-        android: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
-        ios: PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
-      });
+      if (Platform.OS === 'android') {
+        const hasFine = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (hasFine) {
+          return true;
+        }
 
-      if (!permission) return false;
+        const statuses = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ]);
 
-      const status = await check(permission);
-      
-      if (status === RESULTS.GRANTED) {
-        return true;
+        return (
+          statuses[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] ===
+          PermissionsAndroid.RESULTS.GRANTED
+        );
+      } else {
+        const permission = Platform.select({
+          ios: PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
+        });
+
+        if (!permission) return false;
+
+        const status = await check(permission);
+        
+        if (status === RESULTS.GRANTED) {
+          return true;
+        }
+
+        const requestStatus = await request(permission);
+        return requestStatus === RESULTS.GRANTED;
       }
-
-      const requestStatus = await request(permission);
-      return requestStatus === RESULTS.GRANTED;
     } catch (err) {
       console.warn('Permission request error:', err);
       return false;

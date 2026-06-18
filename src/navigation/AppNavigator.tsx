@@ -20,6 +20,7 @@ import { OfficeLocationScreen } from '../screens/OfficeLocationScreen';
 import { RealTimeStatusScreen } from '../screens/RealTimeStatusScreen';
 import { LeaveApprovalsScreen } from '../screens/LeaveApprovalsScreen';
 import { DeviceApprovalsScreen } from '../screens/DeviceApprovalsScreen';
+import { LateApprovalsScreen } from '../screens/LateApprovalsScreen';
 
 // Employee Screens
 import { EmployeeDashboard } from '../screens/EmployeeDashboard';
@@ -51,6 +52,7 @@ export const AppNavigator: React.FC = () => {
           <Stack.Screen name="RealTimeStatus" component={RealTimeStatusScreen} />
           <Stack.Screen name="LeaveApprovals" component={LeaveApprovalsScreen} />
           <Stack.Screen name="DeviceApprovals" component={DeviceApprovalsScreen} />
+          <Stack.Screen name="LateApprovals" component={LateApprovalsScreen} />
           <Stack.Screen name="Payroll" component={PayrollScreen} />
         </>
       ) : user?.role === 'ADMIN' ? (
@@ -63,6 +65,7 @@ export const AppNavigator: React.FC = () => {
           <Stack.Screen name="RealTimeStatus" component={RealTimeStatusScreen} />
           <Stack.Screen name="LeaveApprovals" component={LeaveApprovalsScreen} />
           <Stack.Screen name="DeviceApprovals" component={DeviceApprovalsScreen} />
+          <Stack.Screen name="LateApprovals" component={LateApprovalsScreen} />
           <Stack.Screen name="Payroll" component={PayrollScreen} />
         </>
       ) : (
